@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">Android Website Blocker</string>
+    <string name="app_name">Night Blocker</string>
+    <string name="accessibility_service_label">Night Blocker</string>
+    <string name="accessibility_service_description">Reads the Chrome address bar so Night Blocker can block feed pages (like the Reddit front page) during night hours. Nothing leaves your phone.</string>
 </resources>
