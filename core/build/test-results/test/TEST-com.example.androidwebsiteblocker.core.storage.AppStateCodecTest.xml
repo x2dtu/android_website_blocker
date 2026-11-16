@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.androidwebsiteblocker.core.storage.AppStateCodecTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:46:02.548Z" hostname="80a99728d1ca" time="0.873">
+  <properties/>
+  <testcase name="ignores unknown fields from newer minor changes" classname="com.example.androidwebsiteblocker.core.storage.AppStateCodecTest" time="0.194"/>
+  <testcase name="round trips all state" classname="com.example.androidwebsiteblocker.core.storage.AppStateCodecTest" time="0.356"/>
+  <testcase name="rejects newer file versions" classname="com.example.androidwebsiteblocker.core.storage.AppStateCodecTest" time="0.167"/>
+  <testcase name="empty state round trips" classname="com.example.androidwebsiteblocker.core.storage.AppStateCodecTest" time="0.156"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
