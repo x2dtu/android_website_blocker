@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Only Chrome's events are delivered (packageNames). flagReportViewIds exposes
-    view IDs like com.android.chrome:id/url_bar on nodes, which the debug tree dump uses.
+    Events from all apps (no packageNames filter) so any app can be blocked.
+    flagRetrieveInteractiveWindows: lets the service read the window list to tell real app windows
+    apart from System UI, keyboard, and overlays.
+    flagReportViewIds: exposes view IDs like com.android.chrome:id/url_bar.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews"
+    android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"
-    android:notificationTimeout="300"
-    android:packageNames="com.android.chrome" />
+    android:notificationTimeout="300" />

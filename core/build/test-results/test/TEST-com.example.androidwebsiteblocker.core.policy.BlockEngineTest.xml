@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:46:01.500Z" hostname="80a99728d1ca" time="0.084">
+<testsuite name="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:47:20.275Z" hostname="80a99728d1ca" time="0.03">
   <properties/>
-  <testcase name="window ending mid-session allows" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.035"/>
-  <testcase name="hard beats soft and names the set" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.004"/>
-  <testcase name="usage resets on the next window occurrence" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.003"/>
+  <testcase name="window ending mid-session allows" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.012"/>
+  <testcase name="hard beats soft and names the set" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
+  <testcase name="usage resets on the next window occurrence" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
   <testcase name="returning after grace needs a new open" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
-  <testcase name="exhausted soft set beats another set's open session" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.002"/>
+  <testcase name="exhausted soft set beats another set's open session" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
   <testcase name="other apps are not affected" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
-  <testcase name="total limit cuts the last open short" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.014"/>
-  <testcase name="grace time is configurable" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
+  <testcase name="total limit cuts the last open short" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.005"/>
+  <testcase name="grace time is configurable" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <testcase name="time on the block screen and with screen off does not count" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
-  <testcase name="per-open limit ends the open and re-gates" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
-  <testcase name="website target matches domain and subdomains only" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.003"/>
+  <testcase name="per-open limit ends the open and re-gates" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
+  <testcase name="website target matches domain and subdomains only" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
   <testcase name="two soft sets both gate, unlock uses one open from each" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <testcase name="each open starts fresh at the per-open limit" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
   <testcase name="soft block without limits still gates then allows unlimited" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <testcase name="hard block outside window allows" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
-  <testcase name="no sets allows everything" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
+  <testcase name="no sets allows everything" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <testcase name="soft block shows gate with delay and open count" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <testcase name="duration formatting" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.002"/>
-  <testcase name="opens exhausted becomes a hard block with reason" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.002"/>
+  <testcase name="opens exhausted becomes a hard block with reason" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <testcase name="returning within grace continues the open without counting time away" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
-  <testcase name="targets in a set are limited independently" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
-  <testcase name="suspended and disabled sets are ignored" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
+  <testcase name="targets in a set are limited independently" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
+  <testcase name="suspended and disabled sets are ignored" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <testcase name="usage counts against every matching soft set" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
-  <testcase name="next evaluation is the earlier of session end and window change" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.002"/>
-  <testcase name="hard block inside window" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.006"/>
-  <testcase name="subdomains share one website's usage" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
+  <testcase name="next evaluation is the earlier of session end and window change" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.001"/>
+  <testcase name="hard block inside window" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.003"/>
+  <testcase name="subdomains share one website's usage" classname="com.example.androidwebsiteblocker.core.policy.BlockEngineTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

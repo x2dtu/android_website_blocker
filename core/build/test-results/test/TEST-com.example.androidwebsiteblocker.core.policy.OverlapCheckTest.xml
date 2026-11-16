@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:46:01.587Z" hostname="80a99728d1ca" time="0.012">
+<testsuite name="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:47:20.306Z" hostname="80a99728d1ca" time="0.006">
   <properties/>
   <testcase name="same app at non-overlapping times is fine" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.001"/>
-  <testcase name="window ending at midnight reads as 12 AM" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.005"/>
-  <testcase name="reports overlapping times for a shared app" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.005"/>
+  <testcase name="window ending at midnight reads as 12 AM" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.002"/>
+  <testcase name="reports overlapping times for a shared app" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.002"/>
   <testcase name="subdomain websites overlap" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.0"/>
   <testcase name="different apps at the same time is fine" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.0"/>
-  <testcase name="ignores itself and joins saturday-sunday wrap" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.001"/>
+  <testcase name="ignores itself and joins saturday-sunday wrap" classname="com.example.androidwebsiteblocker.core.policy.OverlapCheckTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
