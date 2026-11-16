@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Android(Website Blocker"
 include(":app")
+include(":core")
