@@ -49,7 +49,11 @@ class NightBlockerService : AccessibilityService() {
         ContextCompat.registerReceiver(this, timeReceiver, timeFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
         controller = BlockController(this, StateStore.get(this)).also { it.start() }
         ForegroundMonitor.setServiceConnected(true)
-        refresh()
+        // Always hand the new controller the current foreground, even if the monitor already
+        // has it (service restarted while the same app stayed on screen).
+        val foreground = detector.detect()
+        ForegroundMonitor.report(foreground, System.currentTimeMillis())
+        controller?.onForegroundChanged(foreground)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
