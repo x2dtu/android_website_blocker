@@ -85,6 +85,7 @@ fun HomeScreen(
     state: AppState,
     serviceOk: Boolean,
     statusCard: @Composable () -> Unit,
+    setupCard: (@Composable () -> Unit)?,
     onOpenSet: (String) -> Unit,
     onCreate: () -> Unit,
     onOpenLog: () -> Unit,
@@ -94,6 +95,7 @@ fun HomeScreen(
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { ScreenHeader("Night Blocker", onBack = null) }
         if (!serviceOk) item { statusCard() }
+        if (setupCard != null) item { setupCard() }
         if (state.sets.isEmpty()) {
             item { Text("No block sets yet. Create one to start blocking apps and websites at set times.") }
         }

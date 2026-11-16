@@ -4,7 +4,9 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.annotation.SuppressLint
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
@@ -51,6 +53,7 @@ class MainActivity : ComponentActivity() {
 
     /** Re-checked on every resume, since the user enables the service in Settings and comes back. */
     private val serviceEnabled = mutableStateOf(false)
+    private val batteryExempt = mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,7 +63,7 @@ class MainActivity : ComponentActivity() {
             AndroidWebsiteBlockerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(Modifier.padding(innerPadding)) {
-                        AppRoot(store, serviceEnabled.value)
+                        AppRoot(store, serviceEnabled.value, batteryExempt.value)
                     }
                 }
             }
@@ -70,6 +73,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         serviceEnabled.value = isServiceEnabled(this)
+        batteryExempt.value = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
     }
 }
 
@@ -83,7 +87,7 @@ fun isServiceEnabled(context: Context): Boolean {
 
 /** Screens: "home", "log", "new", "set:<id>", "edit:<id>". A string so it survives rotation. */
 @Composable
-private fun AppRoot(store: StateStore, serviceEnabled: Boolean) {
+private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: Boolean) {
     val context = LocalContext.current
     val state by store.state.collectAsState()
     val connected by ForegroundMonitor.serviceConnected.collectAsState()
@@ -161,6 +165,7 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean) {
             state = state,
             serviceOk = serviceEnabled && connected,
             statusCard = { ServiceStatusCard(serviceEnabled, connected) },
+            setupCard = if (batteryExempt) null else ({ BatteryCard() }),
             onOpenSet = { screen = "set:$it" },
             onCreate = { screen = "new" },
             onOpenLog = { screen = "log" },
@@ -172,6 +177,28 @@ private fun changeMessage(outcome: ChangeOutcome?, zone: ZoneId): String = when 
     is ChangeOutcome.ApplyNow -> "Saved"
     is ChangeOutcome.Pending -> "This blocks less, so it applies at ${formatInstant(outcome.change.appliesAt, zone)}. You can cancel it until then."
     null -> "Nothing changed"
+}
+
+/** Samsung can put apps to sleep; an exemption keeps blocking reliable. */
+@SuppressLint("BatteryLife") // Personal app, never on the Play Store.
+@Composable
+private fun BatteryCard() {
+    val context = LocalContext.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Keep blocking reliable", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Allow Night Blocker to run without battery restrictions so the phone doesn't put it to sleep. " +
+                    "On Samsung, also make sure it isn't in Settings → Battery → Background usage limits → Sleeping apps.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(onClick = {
+                context.startActivity(
+                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", context.packageName, null)),
+                )
+            }) { Text("Allow") }
+        }
+    }
 }
 
 @Composable

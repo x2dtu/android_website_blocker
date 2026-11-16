@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Lets the app ask to be exempt from battery optimization so Samsung doesn't put it to sleep. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- Package visibility: lets us list launchable apps (picker) and read their names/icons. -->
     <queries>
         <intent>
