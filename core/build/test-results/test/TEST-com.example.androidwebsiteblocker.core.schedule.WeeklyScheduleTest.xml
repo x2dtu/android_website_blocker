@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:42:42.750Z" hostname="80a99728d1ca" time="0.004">
+<testsuite name="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:44:38.939Z" hostname="80a99728d1ca" time="0.004">
   <properties/>
   <testcase name="window crossing midnight is one occurrence" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.002"/>
   <testcase name="fall back keeps wall-clock window" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.0"/>
   <testcase name="start inside spring-forward gap converts to end of gap" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.0"/>
-  <testcase name="rejects empty day window" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.001"/>
-  <testcase name="adjacent and overlapping windows merge" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.0"/>
+  <testcase name="rejects empty day window" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.0"/>
+  <testcase name="adjacent and overlapping windows merge" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.001"/>
   <testcase name="whole week covered resets each sunday" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.0"/>
   <testcase name="start is inclusive, end is exclusive" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.0"/>
   <testcase name="spring forward keeps wall-clock window" classname="com.example.androidwebsiteblocker.core.schedule.WeeklyScheduleTest" time="0.0"/>

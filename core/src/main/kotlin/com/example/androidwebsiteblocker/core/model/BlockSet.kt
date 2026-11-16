@@ -50,6 +50,24 @@ data class SoftLimits(
     }
 }
 
+/** Barriers against turning a block set off on impulse. All configurable. */
+data class ProtectionSettings(
+    /** How long an emergency suspension lasts. */
+    val suspensionDuration: Duration = Duration.ofMinutes(1),
+    /** Max suspensions per window occurrence; null = unlimited. */
+    val maxSuspensions: Int? = 3,
+    /** Wait after a suspension ends before another is allowed. */
+    val suspensionCooldown: Duration = Duration.ofSeconds(30),
+    /** Wait before a disable or loosening edit takes effect. */
+    val changeWait: Duration = Duration.ofMinutes(5),
+) {
+    init {
+        require(suspensionDuration > Duration.ZERO)
+        require(maxSuspensions == null || maxSuspensions >= 0)
+        require(!suspensionCooldown.isNegative && !changeWait.isNegative)
+    }
+}
+
 data class BlockSet(
     val id: String,
     val name: String,
@@ -57,6 +75,12 @@ data class BlockSet(
     val targets: Set<Target>,
     val schedule: WeeklySchedule,
     val softLimits: SoftLimits = SoftLimits(),
+    val protection: ProtectionSettings = ProtectionSettings(),
+    /** Motivational message shown on the block screen. */
+    val message: String = "",
+    val colorArgb: Long = 0xFF5C6BC0,
+    /** See [com.example.androidwebsiteblocker.core.protection.PinHasher]. Null only before setup completes. */
+    val pinHash: String? = null,
     val enabled: Boolean = true,
     /** While now is before this, the whole set is ignored (temporary emergency suspension). */
     val suspendedUntil: Instant? = null,

@@ -87,6 +87,14 @@ class WeeklySchedule(val windows: List<DayWindow>) {
         return spansOf(both)
     }
 
+    /** True if every minute [other] is active, this is too. */
+    fun covers(other: WeeklySchedule): Boolean =
+        other.coverage().apply { andNot(this@WeeklySchedule.coverage()) }.isEmpty
+
+    /** Equal when active at exactly the same times, regardless of how the windows were entered. */
+    override fun equals(other: Any?): Boolean = other is WeeklySchedule && intervals == other.intervals
+    override fun hashCode(): Int = intervals.hashCode()
+
     private fun coverage(): BitSet = BitSet(MINUTES_PER_WEEK).apply {
         for (span in intervals) {
             if (span.end <= MINUTES_PER_WEEK) {
