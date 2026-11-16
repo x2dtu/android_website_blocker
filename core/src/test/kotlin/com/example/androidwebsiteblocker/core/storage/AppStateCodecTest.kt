@@ -49,6 +49,7 @@ class AppStateCodecTest {
         suspensions = mapOf("s1" to SuspensionState("2026-11-14T23:00", 1, now)),
         pendingChanges = mapOf("s1" to PendingChange("s1", soft.copy(enabled = false), now, now.plusSeconds(300))),
         streaks = mapOf("s1" to Streak(5, LocalDate.parse("2026-11-15"), LocalDate.parse("2026-11-01"))),
+        activeOccurrences = mapOf("s1" to "2026-11-14T23:00"),
     )
 
     @Test fun `round trips all state`() {

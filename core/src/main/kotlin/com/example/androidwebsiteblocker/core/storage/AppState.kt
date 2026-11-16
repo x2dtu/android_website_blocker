@@ -28,6 +28,8 @@ data class AppState(
     val suspensions: Map<String, SuspensionState> = emptyMap(),
     val pendingChanges: Map<String, PendingChange> = emptyMap(),
     val streaks: Map<String, Streak> = emptyMap(),
+    /** Last seen window occurrence key per set; a change means an occurrence completed (for streaks). */
+    val activeOccurrences: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -58,6 +60,7 @@ private data class StateDto(
     val suspensions: List<SuspensionDto> = emptyList(),
     val pendingChanges: List<PendingDto> = emptyList(),
     val streaks: List<StreakDto> = emptyList(),
+    val activeOccurrences: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -123,6 +126,7 @@ private fun AppState.toDto() = StateDto(
     suspensions = suspensions.map { (id, s) -> SuspensionDto(id, s.occurrenceKey, s.used, s.lastEndsAt?.toEpochMilli()) },
     pendingChanges = pendingChanges.values.map { PendingDto(it.proposed.toDto(), it.requestedAt.toEpochMilli(), it.appliesAt.toEpochMilli()) },
     streaks = streaks.map { (id, s) -> StreakDto(id, s.days, s.lastCountedDay?.toString(), s.brokenDay?.toString()) },
+    activeOccurrences = activeOccurrences,
 )
 
 private fun StateDto.toDomain() = AppState(
@@ -140,6 +144,7 @@ private fun StateDto.toDomain() = AppState(
         set.id to PendingChange(set.id, set, Instant.ofEpochMilli(it.requestedAt), Instant.ofEpochMilli(it.appliesAt))
     },
     streaks = streaks.associate { it.setId to Streak(it.days, it.lastCountedDay?.let(LocalDate::parse), it.brokenDay?.let(LocalDate::parse)) },
+    activeOccurrences = activeOccurrences,
 )
 
 private fun BlockSet.toDto() = SetDto(

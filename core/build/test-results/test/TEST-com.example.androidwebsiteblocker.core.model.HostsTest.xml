@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.androidwebsiteblocker.core.model.HostsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:47:20.258Z" hostname="80a99728d1ca" time="0.012">
+<testsuite name="com.example.androidwebsiteblocker.core.model.HostsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:54:49.366Z" hostname="80a99728d1ca" time="0.011">
   <properties/>
-  <testcase name="rejects non-urls" classname="com.example.androidwebsiteblocker.core.model.HostsTest" time="0.011"/>
+  <testcase name="rejects non-urls" classname="com.example.androidwebsiteblocker.core.model.HostsTest" time="0.009"/>
   <testcase name="user input drops www" classname="com.example.androidwebsiteblocker.core.model.HostsTest" time="0.0"/>
   <testcase name="extracts host from address bar text" classname="com.example.androidwebsiteblocker.core.model.HostsTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>

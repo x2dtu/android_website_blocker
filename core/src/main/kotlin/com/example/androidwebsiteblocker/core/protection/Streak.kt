@@ -1,6 +1,9 @@
 package com.example.androidwebsiteblocker.core.protection
 
+import com.example.androidwebsiteblocker.core.model.BlockSet
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Daily streak for a block set.
@@ -19,3 +22,7 @@ data class Streak(val days: Int = 0, val lastCountedDay: LocalDate? = null, val 
         else -> copy(days = days + 1, lastCountedDay = day)
     }
 }
+
+/** The day a streak break is charged to: the start date of the current occurrence, or today if outside a window. */
+fun streakDayFor(set: BlockSet, now: Instant, zone: ZoneId): LocalDate =
+    set.schedule.occurrenceAt(now, zone)?.start?.toLocalDate() ?: LocalDate.ofInstant(now, zone)
