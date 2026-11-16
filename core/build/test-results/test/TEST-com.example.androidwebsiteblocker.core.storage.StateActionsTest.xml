@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.androidwebsiteblocker.core.storage.StateActionsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:54:50.665Z" hostname="80a99728d1ca" time="0.805">
+<testsuite name="com.example.androidwebsiteblocker.core.storage.StateActionsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:57:14.888Z" hostname="80a99728d1ca" time="0.808">
   <properties/>
-  <testcase name="suspension breaks streak and is limited" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.114"/>
-  <testcase name="tightening edit applies now and cancels pending" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.114"/>
-  <testcase name="suspended night does not count" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.113"/>
-  <testcase name="streak counts completed nights" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.118"/>
-  <testcase name="new set requires a pin" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.115"/>
-  <testcase name="delete requires disabled and clears everything" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.118"/>
-  <testcase name="disable waits, then applies in maintenance and breaks streak" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.112"/>
+  <testcase name="suspension breaks streak and is limited" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.117"/>
+  <testcase name="tightening edit applies now and cancels pending" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.115"/>
+  <testcase name="suspended night does not count" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.115"/>
+  <testcase name="streak counts completed nights" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.115"/>
+  <testcase name="new set requires a pin" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.113"/>
+  <testcase name="delete requires disabled and clears everything" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.115"/>
+  <testcase name="disable waits, then applies in maintenance and breaks streak" classname="com.example.androidwebsiteblocker.core.storage.StateActionsTest" time="0.118"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

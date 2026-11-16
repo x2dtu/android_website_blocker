@@ -25,4 +25,4 @@ data class Streak(val days: Int = 0, val lastCountedDay: LocalDate? = null, val 
 
 /** The day a streak break is charged to: the start date of the current occurrence, or today if outside a window. */
 fun streakDayFor(set: BlockSet, now: Instant, zone: ZoneId): LocalDate =
-    set.schedule.occurrenceAt(now, zone)?.start?.toLocalDate() ?: LocalDate.ofInstant(now, zone)
+    set.schedule.occurrenceAt(now, zone)?.start?.toLocalDate() ?: now.atZone(zone).toLocalDate()

@@ -66,13 +66,13 @@ sealed interface BlockReason {
 
 private val TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
 
-internal fun formatDuration(d: Duration): String {
+fun formatDuration(d: Duration): String {
     val h = d.toHours()
-    val m = d.toMinutesPart()
-    val s = d.toSecondsPart()
+    val m = d.toMinutes() % 60
+    val s = d.seconds % 60
     return buildList {
         if (h > 0) add("$h h")
         if (m > 0) add("$m min")
-        if (s > 0 || (h == 0L && m == 0)) add("$s s")
+        if (s > 0 || (h == 0L && m == 0L)) add("$s s")
     }.joinToString(" ")
 }

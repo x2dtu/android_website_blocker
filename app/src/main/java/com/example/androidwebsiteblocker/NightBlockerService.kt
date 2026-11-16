@@ -8,6 +8,8 @@ import android.content.IntentFilter
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
+import com.example.androidwebsiteblocker.blocking.BlockController
+import com.example.androidwebsiteblocker.data.StateStore
 
 const val TAG = "NightBlocker"
 
@@ -18,10 +20,17 @@ const val TAG = "NightBlocker"
 class NightBlockerService : AccessibilityService() {
 
     private lateinit var detector: ForegroundDetector
+    private var controller: BlockController? = null
 
     /** Screen off/on and unlock aren't accessibility events; listen for them directly. */
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = refresh()
+    }
+
+    private val timeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            controller?.onTimeChanged()
+        }
     }
 
     override fun onServiceConnected() {
@@ -33,6 +42,12 @@ class NightBlockerService : AccessibilityService() {
             addAction(Intent.ACTION_USER_PRESENT)
         }
         ContextCompat.registerReceiver(this, screenReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        val timeFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+            addAction(Intent.ACTION_TIME_CHANGED)
+        }
+        ContextCompat.registerReceiver(this, timeReceiver, timeFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        controller = BlockController(this, StateStore.get(this)).also { it.start() }
         ForegroundMonitor.setServiceConnected(true)
         refresh()
     }
@@ -49,7 +64,10 @@ class NightBlockerService : AccessibilityService() {
 
     private fun refresh() {
         if (!::detector.isInitialized) return
-        ForegroundMonitor.report(detector.detect(), System.currentTimeMillis())
+        val foreground = detector.detect()
+        if (ForegroundMonitor.report(foreground, System.currentTimeMillis())) {
+            controller?.onForegroundChanged(foreground)
+        }
     }
 
     override fun onInterrupt() {
@@ -57,7 +75,12 @@ class NightBlockerService : AccessibilityService() {
     }
 
     override fun onDestroy() {
-        if (::detector.isInitialized) unregisterReceiver(screenReceiver)
+        controller?.stop()
+        controller = null
+        if (::detector.isInitialized) {
+            unregisterReceiver(screenReceiver)
+            unregisterReceiver(timeReceiver)
+        }
         ForegroundMonitor.setServiceConnected(false)
         super.onDestroy()
     }
