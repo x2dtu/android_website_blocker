@@ -4,7 +4,10 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
+import java.util.BitSet
+import java.util.Locale
 
 const val MINUTES_PER_DAY = 24 * 60
 const val MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY
@@ -47,7 +50,7 @@ data class WindowOccurrence(val start: LocalDateTime, val end: LocalDateTime) {
  *
  * If every minute of the week is covered, there is one occurrence per week starting Sunday 00:00.
  */
-class WeeklySchedule(windows: List<DayWindow>) {
+class WeeklySchedule(val windows: List<DayWindow>) {
 
     /** Half-open interval in minute-of-week. [start] is in [0, WEEK); [end] may exceed WEEK if it wraps past Saturday. */
     private data class Span(val start: Int, val end: Int)
@@ -78,6 +81,23 @@ class WeeklySchedule(windows: List<DayWindow>) {
     fun nextChange(now: Instant, zone: ZoneId): Instant? =
         nextChange(LocalDateTime.ofInstant(now, zone))?.let { toInstant(it, zone) }
 
+    /** Times (in the weekly pattern) when both this and [other] are active. Wrap-around spans are joined. */
+    fun overlapWith(other: WeeklySchedule): List<WeekSpan> {
+        val both = coverage().apply { and(other.coverage()) }
+        return spansOf(both)
+    }
+
+    private fun coverage(): BitSet = BitSet(MINUTES_PER_WEEK).apply {
+        for (span in intervals) {
+            if (span.end <= MINUTES_PER_WEEK) {
+                set(span.start, span.end)
+            } else {
+                set(span.start, MINUTES_PER_WEEK)
+                set(0, span.end - MINUTES_PER_WEEK)
+            }
+        }
+    }
+
     /** Occurrences anchored to last, this, and next week — enough to cover any wrap-around. */
     private fun candidateOccurrences(now: LocalDateTime): List<WindowOccurrence> {
         val thisWeek = now.toLocalDate()
@@ -94,6 +114,22 @@ class WeeklySchedule(windows: List<DayWindow>) {
     }
 
     companion object {
+        private fun spansOf(bits: BitSet): List<WeekSpan> {
+            val spans = mutableListOf<WeekSpan>()
+            var start = bits.nextSetBit(0)
+            while (start >= 0) {
+                val end = bits.nextClearBit(start).coerceAtMost(MINUTES_PER_WEEK)
+                spans += WeekSpan(start, end)
+                start = bits.nextSetBit(end)
+            }
+            if (spans.size > 1 && spans.first().start == 0 && spans.last().end == MINUTES_PER_WEEK) {
+                val first = spans.removeAt(0)
+                val last = spans.removeAt(spans.lastIndex)
+                spans += WeekSpan(last.start, MINUTES_PER_WEEK + first.end)
+            }
+            return spans
+        }
+
         /** Sunday = 0 … Saturday = 6. */
         fun dayIndex(day: DayOfWeek): Int = day.value % 7
 
@@ -131,5 +167,32 @@ class WeeklySchedule(windows: List<DayWindow>) {
             }
             return local.atZone(zone).withEarlierOffsetAtOverlap().toInstant()
         }
+    }
+}
+
+/**
+ * A span of the weekly pattern in minutes since Sunday 00:00. [end] is exclusive and may exceed
+ * one week when the span wraps from Saturday night into Sunday.
+ */
+data class WeekSpan(val start: Int, val end: Int) {
+    /** e.g. "Mon 11:30 PM – Tue 8:00 AM", or "Fri 9:00 AM – 5:00 PM" within one day. */
+    fun describe(): String {
+        val endMinute = end - 1 // label the end by the day of its last covered minute
+        val startDay = start / MINUTES_PER_DAY
+        val endDay = endMinute / MINUTES_PER_DAY
+        val startLabel = "${dayName(startDay)} ${clock(start % MINUTES_PER_DAY)}"
+        val endLabel = clock(endMinute % MINUTES_PER_DAY + 1)
+        return if (startDay == endDay) "$startLabel – $endLabel" else "$startLabel – ${dayName(endDay)} $endLabel"
+    }
+
+    private fun dayName(index: Int): String =
+        DayOfWeek.SUNDAY.plus((index % 7).toLong()).getDisplayName(TextStyle.SHORT, Locale.US)
+
+    private fun clock(minuteOfDay: Int): String {
+        val h24 = (minuteOfDay / 60) % 24
+        val m = minuteOfDay % 60
+        val h12 = if (h24 % 12 == 0) 12 else h24 % 12
+        val ampm = if (h24 < 12) "AM" else "PM"
+        return "%d:%02d %s".format(h12, m, ampm)
     }
 }
