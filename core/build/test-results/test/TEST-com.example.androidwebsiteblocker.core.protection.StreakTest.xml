@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.androidwebsiteblocker.core.protection.StreakTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-16T21:57:14.251Z" hostname="80a99728d1ca" time="0.0">
-  <properties/>
-  <testcase name="break resets and the broken day cannot count" classname="com.example.androidwebsiteblocker.core.protection.StreakTest" time="0.0"/>
-  <testcase name="days without windows do not break it" classname="com.example.androidwebsiteblocker.core.protection.StreakTest" time="0.0"/>
-  <testcase name="counts once per day with a completed window" classname="com.example.androidwebsiteblocker.core.protection.StreakTest" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
