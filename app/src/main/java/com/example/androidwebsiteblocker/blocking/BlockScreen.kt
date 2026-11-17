@@ -51,8 +51,10 @@ data class BlockScreenModel(
     val streakDays: Int,
     /** "Why" lines, primary first. */
     val reasons: List<String>,
-    /** Null = hard block (only "go home"). */
+    /** Null = hard block (only the exit button). */
     val soft: SoftGateInfo?,
+    /** Exit button text: "Go to home screen", or "Open a new tab" for a blocked website. */
+    val leaveLabel: String = "Go to home screen",
 )
 
 data class SoftGateInfo(
@@ -90,9 +92,9 @@ fun BlockScreen(model: BlockScreenModel, onGoHome: () -> Unit, onContinue: () ->
                 Spacer(Modifier.height(16.dp))
                 val soft = model.soft
                 if (soft == null) {
-                    Button(onClick = onGoHome, modifier = Modifier.fillMaxWidth()) { Text("Go to home screen") }
+                    Button(onClick = onGoHome, modifier = Modifier.fillMaxWidth()) { Text(model.leaveLabel) }
                 } else {
-                    SoftControls(model.resetKey, soft, accent, onGoHome, onContinue)
+                    SoftControls(model.resetKey, soft, accent, model.leaveLabel, onGoHome, onContinue)
                 }
             }
         }
@@ -100,7 +102,7 @@ fun BlockScreen(model: BlockScreenModel, onGoHome: () -> Unit, onContinue: () ->
 }
 
 @Composable
-private fun SoftControls(resetKey: String, soft: SoftGateInfo, accent: Color, onGoHome: () -> Unit, onContinue: () -> Unit) {
+private fun SoftControls(resetKey: String, soft: SoftGateInfo, accent: Color, leaveLabel: String, onGoHome: () -> Unit, onContinue: () -> Unit) {
     if (soft.maxOpens != null) {
         OpenDots(used = soft.opensUsed, max = soft.maxOpens, accent = accent)
         Text("${soft.maxOpens - soft.opensUsed}/${soft.maxOpens} left", color = Color.White, style = MaterialTheme.typography.titleMedium)
@@ -123,7 +125,7 @@ private fun SoftControls(resetKey: String, soft: SoftGateInfo, accent: Color, on
     ) {
         Text(if (secondsLeft > 0) "Continue in ${secondsLeft}s" else "Continue to app")
     }
-    TextButton(onClick = onGoHome) { Text("Go to home screen", color = Color.White) }
+    TextButton(onClick = onGoHome) { Text(leaveLabel, color = Color.White) }
 }
 
 /**

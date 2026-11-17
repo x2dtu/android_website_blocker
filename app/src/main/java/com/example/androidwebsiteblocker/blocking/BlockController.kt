@@ -1,10 +1,15 @@
 package com.example.androidwebsiteblocker.blocking
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Browser
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.androidwebsiteblocker.CHROME_PACKAGE
 import com.example.androidwebsiteblocker.TAG
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.Foreground
@@ -38,7 +43,7 @@ class BlockController(private val service: AccessibilityService, private val sto
     private val handler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tickRunnable = Runnable { tick() }
-    private val overlay = BlockOverlay(service, onGoHome = ::goHome, onContinue = ::unlock)
+    private val overlay = BlockOverlay(service, onGoHome = ::leave, onContinue = ::unlock)
 
     private var zone: ZoneId = ZoneId.systemDefault()
     private var engine = BlockEngine(zone, store.state.value.sets, store.state.value.usage)
@@ -82,8 +87,49 @@ class BlockController(private val service: AccessibilityService, private val sto
 
     private fun unlock() = handle(engine.unlock(now()))
 
+    /**
+     * The block screen's exit (button or Back). For a blocked website in Chrome, opens a fresh
+     * tab instead of going home — otherwise reopening Chrome lands straight back on the blocked
+     * tab. The blocked tab and its history are left alone.
+     */
+    private fun leave() {
+        val fg = engine.foreground
+        if (fg != null && isWebsiteBlock(fg) && openSafeTab()) return
+        goHome()
+    }
+
     private fun goHome() {
         service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+    }
+
+    /** True when what's blocked is the site, not the browser app itself. */
+    private fun isWebsiteBlock(fg: Foreground): Boolean {
+        if (fg.packageName != CHROME_PACKAGE || fg.host == null) return false
+        val target = when (val d = engine.evaluate(fg, now())) {
+            is Decision.Blocked -> d.primary.target
+            is Decision.SoftGate -> d.primary.target
+            else -> return false
+        }
+        // If Chrome itself is blocked too, a new tab wouldn't help.
+        return target is Target.Website && engine.evaluate(Foreground(CHROME_PACKAGE), now()) == Decision.Allow
+    }
+
+    private fun openSafeTab(): Boolean {
+        val host = Uri.parse(SAFE_TAB_URL).host
+        if (engine.evaluate(Foreground(CHROME_PACKAGE, host), now()) != Decision.Allow) return false
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(SAFE_TAB_URL)).apply {
+            setPackage(CHROME_PACKAGE)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // Chrome reuses one tab per application id, so repeated exits don't pile up tabs.
+            putExtra(Browser.EXTRA_APPLICATION_ID, service.packageName)
+        }
+        return try {
+            service.startActivity(intent)
+            true
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "Couldn't open a new Chrome tab", e)
+            false
+        }
     }
 
     private fun handle(decision: Decision) {
@@ -122,6 +168,7 @@ class BlockController(private val service: AccessibilityService, private val sto
                     streakDays = state.streakOf(set.id).days,
                     reasons = decision.blockers.map { it.describe() }.distinct(),
                     soft = null,
+                    leaveLabel = leaveLabel(fg),
                 )
             }
             is Decision.SoftGate -> {
@@ -143,11 +190,14 @@ class BlockController(private val service: AccessibilityService, private val sto
                         maxOpens = decision.opens?.max,
                         limitsSummary = limitsSummary(set),
                     ),
+                    leaveLabel = leaveLabel(fg),
                 )
             }
             else -> null
         }
     }
+
+    private fun leaveLabel(fg: Foreground) = if (isWebsiteBlock(fg)) "Open a new tab" else "Go to home screen"
 
     private fun label(target: Target, fg: Foreground): String = when (target) {
         is Target.Website -> fg.host ?: target.domain
@@ -166,6 +216,7 @@ class BlockController(private val service: AccessibilityService, private val sto
 
     companion object {
         private const val MAX_TICK_MS = 60_000L
+        private const val SAFE_TAB_URL = "https://www.google.com/"
 
         fun limitsSummary(set: BlockSet): String = limitsSummary(set.softLimits)
 
