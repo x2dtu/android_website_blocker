@@ -4,11 +4,11 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.provider.Browser
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.core.net.toUri
 import com.example.androidwebsiteblocker.CHROME_PACKAGE
 import com.example.androidwebsiteblocker.TAG
 import com.example.androidwebsiteblocker.core.model.BlockSet
@@ -115,9 +115,9 @@ class BlockController(private val service: AccessibilityService, private val sto
     }
 
     private fun openSafeTab(): Boolean {
-        val host = Uri.parse(SAFE_TAB_URL).host
+        val host = SAFE_TAB_URL.toUri().host
         if (engine.evaluate(Foreground(CHROME_PACKAGE, host), now()) != Decision.Allow) return false
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(SAFE_TAB_URL)).apply {
+        val intent = Intent(Intent.ACTION_VIEW, SAFE_TAB_URL.toUri()).apply {
             setPackage(CHROME_PACKAGE)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             // Chrome reuses one tab per application id, so repeated exits don't pile up tabs.
@@ -163,6 +163,7 @@ class BlockController(private val service: AccessibilityService, private val sto
                     resetKey = "blocked:${fg}",
                     setName = set.name,
                     colorArgb = set.colorArgb,
+                    target = decision.primary.target,
                     targetLabel = label(decision.primary.target, fg),
                     message = set.message,
                     streakDays = state.streakOf(set.id).days,
@@ -178,6 +179,7 @@ class BlockController(private val service: AccessibilityService, private val sto
                     resetKey = "gate:${fg}:${decision.opens?.used}",
                     setName = set.name,
                     colorArgb = set.colorArgb,
+                    target = gate.target,
                     targetLabel = label(gate.target, fg),
                     message = set.message,
                     streakDays = state.streakOf(set.id).days,

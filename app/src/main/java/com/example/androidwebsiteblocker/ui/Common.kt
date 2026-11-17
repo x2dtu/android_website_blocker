@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -119,10 +121,17 @@ fun LetterIcon(text: String, size: Dp = 32.dp) {
 }
 
 @Composable
-fun ScreenHeader(title: String, onBack: (() -> Unit)?) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (onBack != null) TextButton(onClick = onBack) { Text("← Back") }
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = if (onBack == null) 0.dp else 4.dp))
+fun ScreenHeader(title: String, onBack: (() -> Unit)?, subtitle: String? = null) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)) {
+        if (onBack != null) {
+            TextButton(onClick = onBack, modifier = Modifier.padding(start = 0.dp)) { Text("← Back") }
+        } else {
+            Spacer(Modifier.height(16.dp))
+        }
+        Text(title, style = MaterialTheme.typography.headlineMedium)
+        if (subtitle != null) {
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

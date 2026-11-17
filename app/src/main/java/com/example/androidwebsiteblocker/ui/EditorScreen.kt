@@ -24,10 +24,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -91,7 +88,7 @@ private class Draft(set: BlockSet?) {
             if (text.isBlank()) return null
             val n = text.toLongOrNull()
             if (n == null || n < min) {
-                errors += "$field must be a number ≥ $min"
+                errors += "$field must be at least $min"
                 return null
             }
             return n
@@ -100,17 +97,17 @@ private class Draft(set: BlockSet?) {
         if (targets.isEmpty()) errors += "Add at least one app or website"
         if (windows.isEmpty()) errors += "Add at least one time window"
         val softLimits = SoftLimits(
-            unlockDelay = Duration.ofSeconds(num(unlockDelaySec, "Unlock delay") ?: 0),
-            maxOpens = num(maxOpens, "Max opens", 1)?.toInt(),
+            unlockDelay = Duration.ofSeconds(num(unlockDelaySec, "Unlock wait") ?: 0),
+            maxOpens = num(maxOpens, "Opens allowed", 1)?.toInt(),
             perOpenLimit = num(perOpenMin, "Time per open", 1)?.let(Duration::ofMinutes),
             totalLimit = num(totalMin, "Total time", 1)?.let(Duration::ofMinutes),
-            graceTime = Duration.ofSeconds(num(graceSec, "Grace time") ?: 15),
+            graceTime = Duration.ofSeconds(num(graceSec, "Grace period") ?: 15),
         )
         val protection = ProtectionSettings(
-            suspensionDuration = Duration.ofMinutes(num(suspensionMin, "Suspension length", 1) ?: 1),
-            maxSuspensions = num(maxSuspensions, "Max suspensions")?.toInt(),
-            suspensionCooldown = Duration.ofSeconds(num(cooldownSec, "Suspension cooldown") ?: 30),
-            changeWait = Duration.ofMinutes(num(changeWaitMin, "Change wait") ?: 5),
+            suspensionDuration = Duration.ofMinutes(num(suspensionMin, "Emergency pause length", 1) ?: 1),
+            maxSuspensions = num(maxSuspensions, "Emergency pauses allowed")?.toInt(),
+            suspensionCooldown = Duration.ofSeconds(num(cooldownSec, "Wait between pauses") ?: 30),
+            changeWait = Duration.ofMinutes(num(changeWaitMin, "Cooling-off period") ?: 5),
         )
         val pinHash = if (original == null) {
             when {
@@ -151,113 +148,201 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
     BackHandler(onBack = onCancel)
 
     val context = LocalContext.current
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ScreenHeader(if (original == null) "New block set" else "Edit ${original.name}", onBack = onCancel)
+    val accent = draft.color.asColor()
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        ScreenHeader(if (original == null) "New block set" else "Edit block set", onBack = onCancel)
 
-        OutlinedTextField(draft.name, { draft.name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Text("Color")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SET_COLORS.forEach { c ->
-                Box(
-                    Modifier.size(32.dp).background(c.asColor(), CircleShape)
-                        .border(if (c == draft.color) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                        .clickable { draft.color = c },
+        SectionCard("Name & color") {
+            OutlinedTextField(
+                draft.name, { draft.name = it }, label = { Text("Name") }, placeholder = { Text("e.g. Bedtime, Work focus") },
+                singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SET_COLORS.forEach { c ->
+                    Box(
+                        Modifier.size(34.dp).background(c.asColor(), CircleShape)
+                            .border(if (c == draft.color) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            .clickable { draft.color = c },
+                    )
+                }
+            }
+        }
+
+        SectionCard(
+            "How strict?",
+            info = "Hard block: during the schedule, the apps and sites can't be opened at all. The block screen only lets you leave.\n\n" +
+                "Soft block: you can still get in by tapping Continue on the block screen, but with the limits you choose below " +
+                "(a wait before Continue unlocks, a number of opens, and time limits).\n\n" +
+                "Need both for different apps? Make two block sets.",
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ChoiceCard(
+                    "Hard block", "No way in during the schedule.",
+                    draft.mode == BlockMode.HARD, { draft.mode = BlockMode.HARD }, Modifier.weight(1f),
+                )
+                ChoiceCard(
+                    "Soft block", "Let me in, with a wait and limits.",
+                    draft.mode == BlockMode.SOFT, { draft.mode = BlockMode.SOFT }, Modifier.weight(1f),
                 )
             }
         }
 
-        Section("Type")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(draft.mode == BlockMode.HARD, { draft.mode = BlockMode.HARD }, label = { Text("Hard block") })
-            FilterChip(draft.mode == BlockMode.SOFT, { draft.mode = BlockMode.SOFT }, label = { Text("Soft block") })
-        }
-        Text(
-            if (draft.mode == BlockMode.HARD) "Blocked for the whole window, no way in."
-            else "You can still get in, with a delay and limits. Each app/site is limited separately.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-
-        Section("Apps and websites")
-        draft.targets.forEach { t ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TargetIcon(t)
-                Text(targetLabel(context, t), modifier = Modifier.weight(1f))
-                TextButton(onClick = { draft.targets = draft.targets - t }) { Text("Remove") }
+        SectionCard(
+            "Apps & websites",
+            subtitle = "${draft.targets.size} selected",
+            info = "Apps are blocked whenever they're on screen. Websites are blocked in Chrome, including all their subdomains " +
+                "(reddit.com also covers old.reddit.com). When a website is blocked, leaving opens a new tab so your other tabs stay put.",
+        ) {
+            draft.targets.forEach { t ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TargetIcon(t, 36.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text(targetLabel(context, t), style = MaterialTheme.typography.bodyLarge)
+                        Hint(if (t is Target.Website) "Website" else "App")
+                    }
+                    TextButton(onClick = { draft.targets = draft.targets - t }) { Text("Remove") }
+                }
             }
+            FilledTonalButton(onClick = { picking = true }) { Text("+ Choose apps") }
+            WebsiteAdder { domain -> if (Target.Website(domain) !in draft.targets) draft.targets = draft.targets + Target.Website(domain) }
         }
-        OutlinedButton(onClick = { picking = true }) { Text("Choose apps") }
-        WebsiteAdder { domain -> if (draft.targets.none { it == Target.Website(domain) }) draft.targets = draft.targets + Target.Website(domain) }
 
-        Section("Schedule")
-        ScheduleEditor(draft.windows, draft.color.asColor()) { draft.windows = it }
+        SectionCard(
+            "Schedule",
+            subtitle = "When this block set is active",
+            info = "The block set only applies during these times. A window that ends earlier than it starts (like 11:30 PM – 8:00 AM) " +
+                "runs overnight into the next morning.\n\nTimes follow your phone's clock, so daylight saving never shifts them. " +
+                "Soft block limits reset each time a window starts.",
+        ) {
+            ScheduleEditor(draft.windows, accent) { draft.windows = it }
+        }
 
         val warnings = remember(draft.targets, draft.windows, otherSets) { findOverlaps(draft.preview(), otherSets) }
         if (warnings.isNotEmpty()) {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Overlaps with other block sets", style = MaterialTheme.typography.titleSmall)
+            Card(
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Heads up: overlapping block sets", style = MaterialTheme.typography.titleSmall)
                     warnings.forEach { Text("• " + it.describe(targetLabel(context, it.target)), style = MaterialTheme.typography.bodySmall) }
-                    Text("The most restrictive one wins while they overlap.", style = MaterialTheme.typography.bodySmall)
+                    Text("While they overlap, the strictest one wins.", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
 
         if (draft.mode == BlockMode.SOFT) {
-            Section("Soft block limits (leave empty for no limit)")
-            NumberField(draft.unlockDelaySec, { draft.unlockDelaySec = it }, "Unlock delay (seconds)")
-            NumberField(draft.maxOpens, { draft.maxOpens = it }, "Max opens per window")
-            NumberField(draft.perOpenMin, { draft.perOpenMin = it }, "Time per open (minutes)")
-            NumberField(draft.totalMin, { draft.totalMin = it }, "Total time per window (minutes)")
-            NumberField(draft.graceSec, { draft.graceSec = it }, "Grace time to return without a new open (seconds)")
+            SectionCard(
+                "Soft block limits",
+                subtitle = "Each app and site gets its own limits. Everything resets when the next window starts.",
+            ) {
+                NumberSetting(
+                    "Wait before Continue unlocks", draft.unlockDelaySec, { draft.unlockDelaySec = it }, "sec",
+                    hint = "0 = Continue is available right away",
+                    info = "When you open a blocked app, the Continue button stays locked for this long — a moment to change your mind. " +
+                        "If you leave the block screen, the wait starts over next time.",
+                )
+                NumberSetting(
+                    "Opens allowed", draft.maxOpens, { draft.maxOpens = it }, "opens",
+                    hint = "Per app, per window", blankMeans = "Unlimited opens",
+                    info = "How many times you can tap Continue for each app or site during one window. " +
+                        "Shown as circles on the block screen. Once used up, it's blocked until the window ends.",
+                )
+                NumberSetting(
+                    "Time per open", draft.perOpenMin, { draft.perOpenMin = it }, "min",
+                    hint = "Block screen returns after this", blankMeans = "No limit per open",
+                    info = "Each open lasts at most this long, then the block screen comes back. " +
+                        "Leftover time isn't saved — every open starts fresh at this limit.",
+                )
+                NumberSetting(
+                    "Total time", draft.totalMin, { draft.totalMin = it }, "min",
+                    hint = "Per app, per window, across all opens", blankMeans = "No total limit",
+                    info = "Combined time across all opens during one window. When it runs out, the current open is cut short " +
+                        "and the app stays blocked until the window ends.",
+                )
+                NumberSetting(
+                    "Grace period", draft.graceSec, { draft.graceSec = it }, "sec",
+                    hint = "Come back within this and it's the same open",
+                    info = "If you leave the app briefly — to answer a text, say — and return within this time, " +
+                        "it continues the same open instead of using a new one. Time away doesn't count against you.",
+                )
+            }
         }
 
-        OutlinedTextField(draft.message, { draft.message = it }, label = { Text("Block screen message") }, modifier = Modifier.fillMaxWidth())
-
-        Section("Protection")
-        NumberField(draft.suspensionMin, { draft.suspensionMin = it }, "Emergency suspension length (minutes)")
-        NumberField(draft.maxSuspensions, { draft.maxSuspensions = it }, "Max suspensions per window (empty = unlimited)")
-        NumberField(draft.cooldownSec, { draft.cooldownSec = it }, "Cooldown between suspensions (seconds)")
-        NumberField(draft.changeWaitMin, { draft.changeWaitMin = it }, "Wait before disabling/loosening applies (minutes)")
-        if (original == null) {
-            PinField(draft.pin, { draft.pin = it }, "PIN (needed to edit, suspend, or disable)")
-            PinField(draft.pinConfirm, { draft.pinConfirm = it }, "Confirm PIN")
-            Text("There's no PIN recovery — forgetting it means clearing the app's data.", style = MaterialTheme.typography.bodySmall)
-        } else {
-            Text(
-                "Changes that block less (or weaken protection) wait ${original.protection.changeWait.toMinutes()} min before applying.",
-                style = MaterialTheme.typography.bodySmall,
+        SectionCard(
+            "Block screen message",
+            info = "Shown in big letters every time this block set stops you. Write something that'll actually work on you at 1 AM.",
+        ) {
+            OutlinedTextField(
+                draft.message, { draft.message = it }, placeholder = { Text("e.g. Future you will thank you. Go to sleep.") },
+                shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(),
             )
         }
 
-        errors.forEach { Text("• $it", color = MaterialTheme.colorScheme.error) }
+        SectionCard("Safeguards", subtitle = "Make it harder to give in on impulse") {
+            NumberSetting(
+                "Emergency pause length", draft.suspensionMin, { draft.suspensionMin = it }, "min",
+                hint = "How long an emergency pause lasts",
+                info = "In a real emergency you can pause the whole block set with your PIN. It turns itself back on after this long. " +
+                    "Pausing resets the streak.",
+            )
+            NumberSetting(
+                "Emergency pauses allowed", draft.maxSuspensions, { draft.maxSuspensions = it }, "per window",
+                hint = "Resets when the next window starts", blankMeans = "Unlimited pauses",
+                info = "How many emergency pauses you get during one scheduled window.",
+            )
+            NumberSetting(
+                "Wait between pauses", draft.cooldownSec, { draft.cooldownSec = it }, "sec",
+                hint = "After a pause ends",
+                info = "After an emergency pause ends, you have to wait this long before you can pause again, " +
+                    "so pauses can't be chained back-to-back.",
+            )
+            NumberSetting(
+                "Cooling-off period", draft.changeWaitMin, { draft.changeWaitMin = it }, "min",
+                hint = "For disabling or weakening this set",
+                info = "Disabling this block set, or editing it to block less (fewer apps, shorter times, looser limits), " +
+                    "only takes effect after this wait — and you can cancel it in the meantime. " +
+                    "Changes that block more apply immediately. Lowering this wait also has to wait.",
+            )
+        }
+
+        if (original == null) {
+            SectionCard(
+                "PIN",
+                subtitle = "Needed to edit, pause, or disable this block set",
+                info = "4–12 digits. There's no recovery — if you forget it, the only way out is clearing the app's data, " +
+                    "which deletes all block sets.",
+            ) {
+                PinField(draft.pin, { draft.pin = it }, "PIN")
+                PinField(draft.pinConfirm, { draft.pinConfirm = it }, "Confirm PIN")
+            }
+        } else {
+            Hint(
+                "Changes that block less wait ${original.protection.changeWait.toMinutes()} min before applying. " +
+                    "Changes that block more apply right away.",
+            )
+        }
+
+        if (errors.isNotEmpty()) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Column(Modifier.padding(14.dp)) {
+                    errors.forEach { Text("• $it", color = MaterialTheme.colorScheme.onErrorContainer) }
+                }
+            }
+        }
         Button(
             onClick = {
                 val (set, problems) = draft.build(original)
                 errors = problems
                 if (set != null) onSave(set)
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text(if (original == null) "Create block set" else "Save changes") }
         Spacer(Modifier.height(32.dp))
     }
-}
-
-@Composable
-private fun Section(title: String) {
-    HorizontalDivider()
-    Text(title, style = MaterialTheme.typography.titleMedium)
-}
-
-@Composable
-private fun NumberField(value: String, onChange: (String) -> Unit, label: String) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = { v -> onChange(v.filter { it.isDigit() }.take(6)) },
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 @Composable
@@ -266,13 +351,14 @@ private fun WebsiteAdder(onAdd: (String) -> Unit) {
     val domain = domainFromUserInput(text)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
-            text, { text = it }, label = { Text("Website, e.g. reddit.com") }, singleLine = true,
+            text, { text = it }, label = { Text("Add a website") }, placeholder = { Text("reddit.com") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            shape = MaterialTheme.shapes.medium,
+            supportingText = { Text(domain?.let { "Blocks $it and its subdomains" } ?: "Domain only, no https:// needed") },
             modifier = Modifier.weight(1f),
         )
-        Button(enabled = domain != null, onClick = { domain?.let(onAdd); text = "" }) { Text("Add") }
+        FilledTonalButton(enabled = domain != null, onClick = { domain?.let(onAdd); text = "" }) { Text("Add") }
     }
-    if (domain != null) Text("Blocks $domain and its subdomains", style = MaterialTheme.typography.bodySmall)
 }
 
 /** Searchable list of installed apps; search runs shortly after you stop typing. */
@@ -289,36 +375,40 @@ private fun AppPickerScreen(selected: Set<String>, onDone: (Set<String>) -> Unit
     }
     BackHandler { onDone(chosen) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         ScreenHeader("Choose apps", onBack = { onDone(chosen) })
-        OutlinedTextField(query, { query = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            query, { query = it }, placeholder = { Text("Search apps") }, singleLine = true,
+            shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth(),
+        )
         val list = apps
         if (list == null) {
-            Text("Loading apps…", modifier = Modifier.padding(16.dp))
+            Hint("Loading apps…", Modifier.padding(16.dp))
         } else {
             val filtered = list.filter {
                 appliedQuery.isBlank() || it.label.contains(appliedQuery, ignoreCase = true) || it.packageName.contains(appliedQuery, ignoreCase = true)
             }
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
                 items(filtered, key = { it.packageName }) { app ->
                     Row(
                         Modifier.fillMaxWidth().clickable {
                             chosen = if (app.packageName in chosen) chosen - app.packageName else chosen + app.packageName
-                        }.padding(vertical = 6.dp),
+                        }.padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        AppIcon(app.packageName, 36.dp)
+                        AppIcon(app.packageName, 40.dp)
                         Column(Modifier.weight(1f)) {
-                            Text(app.label)
-                            Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text(app.label, style = MaterialTheme.typography.bodyLarge)
+                            Hint(app.packageName)
                         }
                         Checkbox(checked = app.packageName in chosen, onCheckedChange = null)
                     }
                 }
             }
         }
-        Button(onClick = { onDone(chosen) }, modifier = Modifier.fillMaxWidth()) { Text("Done (${chosen.size} selected)") }
+        Button(onClick = { onDone(chosen) }, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).height(52.dp)) {
+            Text("Done · ${chosen.size} selected")
+        }
     }
 }
-

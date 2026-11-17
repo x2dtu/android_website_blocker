@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.androidwebsiteblocker.core.policy.formatDuration
 import com.example.androidwebsiteblocker.core.protection.ChangeOutcome
 import com.example.androidwebsiteblocker.core.protection.SuspensionCheck
 import com.example.androidwebsiteblocker.core.storage.StateActions
@@ -138,8 +139,11 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
                         SetAction.SUSPEND -> {
                             var check: SuspensionCheck? = null
                             store.update { s -> StateActions.suspend(s, set.id, now, zone).also { check = it.second }.first }
-                            if (check is SuspensionCheck.Allowed) toast("${set.name} suspended. Streak reset.")
-                            else toast("Couldn't suspend: $check")
+                            if (check is SuspensionCheck.Allowed) {
+                                toast("${set.name} paused for ${formatDuration(set.protection.suspensionDuration)}. Streak reset.")
+                            } else {
+                                toast("Can't pause right now")
+                            }
                         }
                         SetAction.DISABLE, SetAction.ENABLE -> {
                             var outcome: ChangeOutcome? = null
@@ -174,8 +178,8 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
 }
 
 private fun changeMessage(outcome: ChangeOutcome?, zone: ZoneId): String = when (outcome) {
-    is ChangeOutcome.ApplyNow -> "Saved"
-    is ChangeOutcome.Pending -> "This blocks less, so it applies at ${formatInstant(outcome.change.appliesAt, zone)}. You can cancel it until then."
+    is ChangeOutcome.ApplyNow -> "Saved — in effect now"
+    is ChangeOutcome.Pending -> "This blocks less, so it takes effect at ${formatInstant(outcome.change.appliesAt, zone)}. You can cancel it until then."
     null -> "Nothing changed"
 }
 

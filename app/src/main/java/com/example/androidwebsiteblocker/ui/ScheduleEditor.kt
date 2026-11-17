@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,116 +35,148 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.schedule.DayWindow
 import com.example.androidwebsiteblocker.core.schedule.MINUTES_PER_DAY
+import com.example.androidwebsiteblocker.core.schedule.WindowGroup
+import com.example.androidwebsiteblocker.core.schedule.clockLabel
+import com.example.androidwebsiteblocker.core.schedule.groupWindows
+import com.example.androidwebsiteblocker.core.schedule.shortName
 import java.time.DayOfWeek
-import java.time.format.TextStyle
-import java.util.Locale
 
 /** Sunday first, matching the week definition. */
 val WEEK_DAYS: List<DayOfWeek> = listOf(DayOfWeek.SUNDAY) + DayOfWeek.entries.filter { it != DayOfWeek.SUNDAY }
 
-fun DayOfWeek.short(): String = getDisplayName(TextStyle.SHORT, Locale.US)
-
-fun clockLabel(minuteOfDay: Int): String {
-    val h24 = (minuteOfDay / 60) % 24
-    val m = minuteOfDay % 60
-    val h12 = if (h24 % 12 == 0) 12 else h24 % 12
-    return "%d:%02d %s".format(h12, m, if (h24 < 12) "AM" else "PM")
-}
-
 /** Seven stacked bars, one per day; blocked times are drawn in [color]. */
 @Composable
 fun WeekBars(windows: List<DayWindow>, color: Color, modifier: Modifier = Modifier) {
-    val track = MaterialTheme.colorScheme.surfaceVariant
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
     val tick = MaterialTheme.colorScheme.outline
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
         WEEK_DAYS.forEach { day ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(day.short(), style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(40.dp))
-                Canvas(Modifier.fillMaxWidth().height(16.dp)) {
-                    val r = CornerRadius(4.dp.toPx())
+                Text(
+                    day.shortName(), style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(38.dp),
+                )
+                Canvas(Modifier.fillMaxWidth().height(14.dp)) {
+                    val r = CornerRadius(size.height / 2)
                     drawRoundRect(track, cornerRadius = r)
+                    listOf(6, 12, 18).forEach { h ->
+                        val x = size.width * h / 24f
+                        drawLine(tick, Offset(x, size.height * 0.25f), Offset(x, size.height * 0.75f), strokeWidth = 1.dp.toPx())
+                    }
                     windows.filter { it.day == day }.forEach { w ->
                         val x0 = size.width * w.startMinute / MINUTES_PER_DAY
                         val x1 = size.width * w.endMinute / MINUTES_PER_DAY
                         drawRoundRect(color, topLeft = Offset(x0, 0f), size = Size(x1 - x0, size.height), cornerRadius = r)
                     }
-                    listOf(6, 12, 18).forEach { h ->
-                        val x = size.width * h / 24f
-                        drawLine(tick, Offset(x, 0f), Offset(x, size.height * 0.3f), strokeWidth = 1.dp.toPx())
-                    }
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(start = 40.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            listOf("12a", "6a", "12p", "6p", "12a").forEach { Text(it, style = MaterialTheme.typography.labelSmall) }
+        Row(Modifier.fillMaxWidth().padding(start = 38.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf("12a", "6a", "12p", "6p", "12a").forEach {
+                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
 
-/** Bars + list of windows with remove buttons + "add" dialog. */
+/** One row per time range ("11:30 PM – 8:00 AM (next day)" / "Sun–Thu"). */
+@Composable
+fun WindowGroupRow(group: WindowGroup, color: Color, onClick: (() -> Unit)? = null, onRemove: (() -> Unit)? = null) {
+    Surface(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            ColorDot(color, 10.dp)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(group.describeTimes(), style = MaterialTheme.typography.bodyLarge)
+                Hint(group.describeDays())
+            }
+            if (onRemove != null) TextButton(onClick = onRemove) { Text("Remove") }
+        }
+    }
+}
+
+/** Bars + grouped time ranges (tap to edit) + "add" dialog. */
 @Composable
 fun ScheduleEditor(windows: List<DayWindow>, color: Color, onChange: (List<DayWindow>) -> Unit) {
+    var editing by remember { mutableStateOf<WindowGroup?>(null) }
     var adding by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val groups = remember(windows) { groupWindows(windows) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         WeekBars(windows, color)
-        WEEK_DAYS.forEach { day ->
-            windows.filter { it.day == day }.sortedBy { it.startMinute }.forEach { w ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${day.short()}  ${clockLabel(w.startMinute)} – ${clockLabel(w.endMinute)}", modifier = Modifier.weight(1f))
-                    TextButton(onClick = { onChange(windows - w) }) { Text("Remove") }
-                }
-            }
+        groups.forEach { g ->
+            WindowGroupRow(g, color, onClick = { editing = g }, onRemove = { onChange(windows - g.toWindows().toSet()) })
         }
-        OutlinedButton(onClick = { adding = true }) { Text("Add time window") }
+        if (groups.isEmpty()) Hint("No times yet. Add when this block set should be active.")
+        FilledTonalButton(onClick = { adding = true }) { Text("+ Add time window") }
     }
     if (adding) {
-        AddWindowDialog(onAdd = { onChange(windows + it); adding = false }, onDismiss = { adding = false })
+        WindowDialog(null, onSave = { onChange(windows + it.toWindows()); adding = false }, onDismiss = { adding = false })
+    }
+    editing?.let { g ->
+        WindowDialog(
+            g,
+            onSave = { onChange(windows - g.toWindows().toSet() + it.toWindows()); editing = null },
+            onDismiss = { editing = null },
+        )
     }
 }
 
+private val WEEKDAYS = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)
+private val SCHOOL_NIGHTS = setOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY)
+
 /**
- * Pick days and a start/end time. If the end is at or before the start, the window runs past
- * midnight into the next day (stored as two per-day pieces).
+ * Pick days and start/end times. If the end is at or before the start, the window runs past
+ * midnight and ends the next morning.
  */
 @Composable
-private fun AddWindowDialog(onAdd: (List<DayWindow>) -> Unit, onDismiss: () -> Unit) {
+private fun WindowDialog(initial: WindowGroup?, onSave: (WindowGroup) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    var days by remember { mutableStateOf(setOf<DayOfWeek>()) }
-    var start by remember { mutableIntStateOf(22 * 60) }
-    var end by remember { mutableIntStateOf(7 * 60) }
-    fun pick(initial: Int, set: (Int) -> Unit) {
-        TimePickerDialog(context, { _, h, m -> set(h * 60 + m) }, initial / 60, initial % 60, false).show()
+    var days by remember { mutableStateOf(initial?.days ?: emptySet()) }
+    var start by remember { mutableIntStateOf(initial?.start ?: (22 * 60)) }
+    var end by remember { mutableIntStateOf(initial?.end?.let { if (it == MINUTES_PER_DAY) 0 else it } ?: (7 * 60)) }
+    fun pick(initialMinute: Int, set: (Int) -> Unit) {
+        TimePickerDialog(context, { _, h, m -> set(h * 60 + m) }, initialMinute / 60, initialMinute % 60, false).show()
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add time window") },
+        title = { Text(if (initial == null) "Add time window" else "Edit time window") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Days")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Days", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     WEEK_DAYS.forEach { d ->
-                        FilterChip(selected = d in days, onClick = { days = if (d in days) days - d else days + d }, label = { Text(d.short()) })
+                        FilterChip(selected = d in days, onClick = { days = if (d in days) days - d else days + d }, label = { Text(d.shortName()) })
                     }
                 }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AssistChip(onClick = { days = DayOfWeek.entries.toSet() }, label = { Text("Every day") })
+                    AssistChip(onClick = { days = WEEKDAYS }, label = { Text("Weekdays") })
+                    AssistChip(onClick = { days = SCHOOL_NIGHTS }, label = { Text("Sun–Thu") })
+                }
+                Text("Time", style = MaterialTheme.typography.titleSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { pick(start) { start = it } }) { Text("From ${clockLabel(start)}") }
-                    OutlinedButton(onClick = { pick(end) { end = it } }) { Text("To ${clockLabel(end)}") }
+                    OutlinedButton(onClick = { pick(start) { start = it } }, modifier = Modifier.weight(1f)) { Text("From ${clockLabel(start)}") }
+                    OutlinedButton(onClick = { pick(end) { end = it } }, modifier = Modifier.weight(1f)) { Text("To ${clockLabel(end)}") }
                 }
-                if (end <= start) {
-                    Text("Ends the next day.", style = MaterialTheme.typography.bodySmall)
-                }
+                Hint(
+                    when {
+                        end == 0 -> "Runs until midnight."
+                        end <= start -> "Runs overnight — ends at ${clockLabel(end)} the next morning."
+                        else -> "Same-day window."
+                    },
+                )
             }
         },
         confirmButton = {
-            TextButton(enabled = days.isNotEmpty(), onClick = { onAdd(days.flatMap { windowsFor(it, start, end) }) }) { Text("Add") }
+            TextButton(enabled = days.isNotEmpty(), onClick = { onSave(WindowGroup(days, start, if (end == 0) MINUTES_PER_DAY else end)) }) {
+                Text("Save")
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
-
-fun windowsFor(day: DayOfWeek, start: Int, end: Int): List<DayWindow> =
-    if (end > start) listOf(DayWindow(day, start, end))
-    else listOfNotNull(
-        DayWindow(day, start, MINUTES_PER_DAY),
-        if (end > 0) DayWindow(day.plus(1), 0, end) else null,
-    )

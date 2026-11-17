@@ -4,14 +4,17 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -22,14 +25,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.androidwebsiteblocker.blocking.BlockController
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.policy.formatDuration
 import com.example.androidwebsiteblocker.core.protection.SuspensionCheck
 import com.example.androidwebsiteblocker.core.protection.SuspensionPolicy
+import com.example.androidwebsiteblocker.core.schedule.groupWindows
 import com.example.androidwebsiteblocker.core.storage.AppState
 import com.example.androidwebsiteblocker.core.storage.streakOf
 import java.time.ZoneId
@@ -37,9 +42,9 @@ import java.time.ZoneId
 /** PIN-protected actions on one block set. */
 enum class SetAction(val pinTitle: String) {
     EDIT("Enter PIN to edit"),
-    SUSPEND("Enter PIN to suspend"),
-    DISABLE("Enter PIN to disable"),
-    ENABLE("Enter PIN to enable"),
+    SUSPEND("Enter PIN to pause"),
+    DISABLE("Enter PIN to turn off"),
+    ENABLE("Enter PIN to turn on"),
     DELETE("Enter PIN to delete"),
 }
 
@@ -55,66 +60,107 @@ fun DetailScreen(
     val context = LocalContext.current
     val now = rememberNow(1_000)
     val zone = ZoneId.systemDefault()
+    val accent = set.colorArgb.asColor()
+    val status = statusOf(set, state, now, zone)
     var pinFor by remember { mutableStateOf<SetAction?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         ScreenHeader(set.name, onBack = onBack)
-        Text(statusLine(set, state, now, zone), style = MaterialTheme.typography.bodyLarge)
-        val streak = state.streakOf(set.id).days
-        if (streak > 0) Text("$streak-day streak", color = set.colorArgb.asColor(), style = MaterialTheme.typography.titleSmall)
+
+        // Status hero
+        Card(
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.18f)),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill(status.state.label(), status.state.color())
+                    Pill(if (set.mode == BlockMode.HARD) "Hard block" else "Soft block", accent)
+                }
+                Text(status.text, style = MaterialTheme.typography.titleLarge)
+                val streak = state.streakOf(set.id).days
+                Text(
+                    if (streak > 0) "🔥 $streak-day streak" else "No streak yet — get through a full window without pausing.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (streak > 0) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (set.message.isNotBlank()) Text("“${set.message}”", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
 
         state.pendingChanges[set.id]?.let { pending ->
-            Card {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val what = if (!pending.proposed.enabled) "Disabling this set" else "A change that blocks less"
-                    Text("$what applies at ${formatInstant(pending.appliesAt, zone)}.")
-                    OutlinedButton(onClick = onCancelPending) { Text("Cancel pending change") }
+            Card(
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val what = if (!pending.proposed.enabled) "Turning this block set off" else "Your change (it blocks less)"
+                    Text("$what takes effect at ${formatInstant(pending.appliesAt, zone)}.", style = MaterialTheme.typography.bodyMedium)
+                    OutlinedButton(onClick = onCancelPending) { Text("Cancel — keep it as is") }
                 }
             }
         }
 
-        WeekBars(set.schedule.windows, set.colorArgb.asColor())
+        SectionCard("Schedule") {
+            WeekBars(set.schedule.windows, accent)
+            groupWindows(set.schedule.windows).forEach { WindowGroupRow(it, accent) }
+        }
 
-        Text(if (set.mode == BlockMode.HARD) "Hard block" else "Soft block", style = MaterialTheme.typography.titleMedium)
+        SectionCard("Blocks", subtitle = "${set.targets.size} apps and websites") {
+            set.targets.sortedBy { it is Target.Website }.forEach { t ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TargetIcon(t, 36.dp)
+                    Text(targetLabel(context, t), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+
         if (set.mode == BlockMode.SOFT) {
-            val l = set.softLimits
-            val lines = listOfNotNull(
-                "Unlock delay: ${formatDuration(l.unlockDelay)}",
-                l.maxOpens?.let { "Max opens: $it" },
-                BlockController.limitsSummary(l).takeIf { it.isNotBlank() },
-                "Grace time: ${formatDuration(l.graceTime)}",
-            )
-            lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        }
-        if (set.message.isNotBlank()) Text("“${set.message}”", style = MaterialTheme.typography.bodyMedium)
-
-        HorizontalDivider()
-        set.targets.forEach { t ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TargetIcon(t)
-                Text(targetLabel(context, t))
+            SectionCard("Soft block limits", subtitle = "Per app or site, reset each window") {
+                val l = set.softLimits
+                LimitRow("Wait before Continue unlocks", if (l.unlockDelay.isZero) "None" else formatDuration(l.unlockDelay))
+                LimitRow("Opens allowed", l.maxOpens?.toString() ?: "Unlimited")
+                LimitRow("Time per open", l.perOpenLimit?.let(::formatDuration) ?: "No limit")
+                LimitRow("Total time", l.totalLimit?.let(::formatDuration) ?: "No limit")
+                LimitRow("Grace period", formatDuration(l.graceTime))
             }
         }
-        HorizontalDivider()
 
-        val suspension = SuspensionPolicy.check(set, state.suspensions[set.id], now, zone)
-        Text(suspensionText(suspension, set, zone), style = MaterialTheme.typography.bodySmall)
-        Button(
-            enabled = suspension is SuspensionCheck.Allowed,
-            onClick = { pinFor = SetAction.SUSPEND },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Emergency: suspend for ${formatDuration(set.protection.suspensionDuration)}") }
-
-        OutlinedButton(onClick = { pinFor = SetAction.EDIT }, modifier = Modifier.fillMaxWidth()) { Text("Edit") }
-        if (set.enabled) {
-            OutlinedButton(onClick = { pinFor = SetAction.DISABLE }, modifier = Modifier.fillMaxWidth()) {
-                Text("Disable (applies after ${formatDuration(set.protection.changeWait)})")
-            }
-        } else {
-            OutlinedButton(onClick = { pinFor = SetAction.ENABLE }, modifier = Modifier.fillMaxWidth()) { Text("Enable") }
-            OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) { Text("Delete") }
+        SectionCard(
+            "Emergency pause",
+            info = "Pauses the whole block set for ${formatDuration(set.protection.suspensionDuration)}, then it turns itself back on. " +
+                "Needs your PIN, is limited per window, and resets your streak.",
+        ) {
+            val check = SuspensionPolicy.check(set, state.suspensions[set.id], now, zone)
+            Hint(pauseText(check, set, zone))
+            Button(
+                enabled = check is SuspensionCheck.Allowed,
+                onClick = { pinFor = SetAction.SUSPEND },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Pause for ${formatDuration(set.protection.suspensionDuration)}") }
         }
+
+        SectionCard("Manage") {
+            OutlinedButton(onClick = { pinFor = SetAction.EDIT }, modifier = Modifier.fillMaxWidth()) { Text("Edit block set") }
+            if (set.enabled) {
+                OutlinedButton(onClick = { pinFor = SetAction.DISABLE }, modifier = Modifier.fillMaxWidth()) { Text("Turn off") }
+                Hint("Turning off takes effect after ${formatDuration(set.protection.changeWait)}. You can cancel it until then.")
+            } else {
+                Button(onClick = { pinFor = SetAction.ENABLE }, modifier = Modifier.fillMaxWidth()) { Text("Turn on") }
+                OutlinedButton(
+                    onClick = { confirmDelete = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Delete") }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
     }
 
     pinFor?.let { action ->
@@ -122,16 +168,24 @@ fun DetailScreen(
     }
     if (confirmDelete) {
         ConfirmDialog(
-            "Delete ${set.name}?", "This removes the block set and its streak.", "Continue",
+            "Delete ${set.name}?", "This removes the block set and its streak for good.", "Continue",
             onConfirm = { confirmDelete = false; pinFor = SetAction.DELETE }, onDismiss = { confirmDelete = false },
         )
     }
 }
 
-private fun suspensionText(check: SuspensionCheck, set: BlockSet, zone: ZoneId): String = when (check) {
-    is SuspensionCheck.Allowed -> check.remainingAfter?.let { "Suspensions left this window: ${it + 1}" } ?: "Unlimited suspensions"
-    SuspensionCheck.NotInWindow -> if (set.enabled) "Not active right now — nothing to suspend." else "Disabled."
-    is SuspensionCheck.AlreadySuspended -> "Suspended until ${formatInstantSeconds(check.until, zone)}."
-    is SuspensionCheck.LimitReached -> "All ${check.max} suspensions used this window."
-    is SuspensionCheck.CoolingDown -> "Next suspension available at ${formatInstantSeconds(check.until, zone)}."
+@Composable
+private fun LimitRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = Color.Unspecified)
+    }
+}
+
+private fun pauseText(check: SuspensionCheck, set: BlockSet, zone: ZoneId): String = when (check) {
+    is SuspensionCheck.Allowed -> check.remainingAfter?.let { "${it + 1} left this window." } ?: "Unlimited this window."
+    SuspensionCheck.NotInWindow -> if (set.enabled) "Only available while the block set is on." else "The block set is turned off."
+    is SuspensionCheck.AlreadySuspended -> "Paused until ${formatInstantSeconds(check.until, zone)}."
+    is SuspensionCheck.LimitReached -> "All ${check.max} pauses used this window."
+    is SuspensionCheck.CoolingDown -> "Next pause available at ${formatInstantSeconds(check.until, zone)}."
 }
