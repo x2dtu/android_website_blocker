@@ -5,6 +5,7 @@ import android.app.KeyguardManager
 import android.os.PowerManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.example.androidwebsiteblocker.blocking.BlockOverlay
 import com.example.androidwebsiteblocker.core.model.Foreground
 import com.example.androidwebsiteblocker.core.model.hostFromAddressBar
 
@@ -30,7 +31,9 @@ class ForegroundDetector(private val service: AccessibilityService) {
 
     fun detect(): Foreground? {
         if (!power.isInteractive || keyguard.isKeyguardLocked) return null
-        val appWindows = service.windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val appWindows = service.windows.filter {
+            it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.title?.toString() != BlockOverlay.OVERLAY_WINDOW_TITLE
+        }
         val window = appWindows.firstOrNull { it.isFocused }
             ?: appWindows.firstOrNull { it.isActive }
             ?: appWindows.maxByOrNull { it.layer }

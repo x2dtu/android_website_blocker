@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -81,7 +82,8 @@ fun BlockScreen(model: BlockScreenModel, onGoHome: () -> Unit, onContinue: () ->
         Box(
             Modifier.fillMaxSize()
                 .background(Brush.verticalGradient(listOf(lerp(Ink, accent, 0.35f), Ink, Ink)))
-                .padding(horizontal = 28.dp, vertical = 48.dp),
+                .safeDrawingPadding()
+                .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Column(
                 Modifier.align(Alignment.Center).fillMaxWidth(),

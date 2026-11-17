@@ -4,9 +4,11 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.provider.Settings
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
@@ -23,9 +25,8 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 /**
- * Full-screen block screen drawn over the blocked app using an accessibility overlay window
- * (no "draw over other apps" permission needed). The navigation bar stays visible; Back leaves
- * (home, or a new tab for websites).
+ * Full-screen block screen drawn over the blocked app. Back leaves (home, or a new tab for
+ * websites). Uses a "display over other apps" window when allowed, else an accessibility overlay.
  */
 class BlockOverlay(
     private val service: AccessibilityService,
@@ -48,33 +49,56 @@ class BlockOverlay(
         }
         v.setViewTreeLifecycleOwner(o)
         v.setViewTreeSavedStateRegistryOwner(o)
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            0,
-            PixelFormat.OPAQUE,
-        )
-        applyNavBarGap(params)
+        fullScreen = Settings.canDrawOverlays(service)
+        val params = if (fullScreen) fullScreenParams() else accessibilityParams()
+        params.title = OVERLAY_WINDOW_TITLE
         windowManager.addView(v, params)
         view = v
         owner = o
     }
 
-    /** Re-fit around the navigation bar after rotation. */
+    /** Whether the current block screen is the full-screen ("display over other apps") kind. */
+    private var fullScreen = false
+
+    /**
+     * Preferred: a "display over other apps" window. These sit *below* the status bar and
+     * navigation bar, so the block screen fills the whole display and the system bars (time,
+     * battery, Back/Home/Recents or the gesture bar) draw on top and stay usable.
+     */
+    private fun fullScreenParams() = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+        PixelFormat.OPAQUE,
+    ).apply {
+        if (Build.VERSION.SDK_INT >= 30) {
+            fitInsetsTypes = 0 // draw behind the system bars
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        }
+    }
+
+    /**
+     * Fallback without that permission: an accessibility overlay. Android always draws these above
+     * the navigation bar, so we shrink the window to stop above it.
+     */
+    private fun accessibilityParams() = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+        0,
+        PixelFormat.OPAQUE,
+    ).also(::applyNavBarGap)
+
+    /** Re-fit around the navigation bar after rotation (fallback mode only). */
     fun relayout() {
         val v = view ?: return
+        if (fullScreen) return
         val params = v.layoutParams as WindowManager.LayoutParams
         applyNavBarGap(params)
         windowManager.updateViewLayout(v, params)
     }
 
-    /**
-     * Keeps the navigation bar (Back / Home / Recents) visible and usable — accessibility overlays
-     * otherwise draw on top of it. Two layers: ask the system to fit the window around the bar,
-     * and also size it explicitly from the current insets in case the system doesn't apply bar
-     * insets to overlay windows. Back on the bar still means "leave".
-     */
     private fun applyNavBarGap(params: WindowManager.LayoutParams) {
         if (Build.VERSION.SDK_INT < 30) return
         params.fitInsetsTypes = WindowInsets.Type.navigationBars()
@@ -93,6 +117,11 @@ class BlockOverlay(
         view = null
         owner = null
         model.value = null
+    }
+
+    companion object {
+        /** Lets the foreground detector recognize (and ignore) our own block screen window. */
+        const val OVERLAY_WINDOW_TITLE = "NightBlocker block screen"
     }
 }
 
@@ -117,6 +146,13 @@ private class OverlayView(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         requestFocus()
+        if (Build.VERSION.SDK_INT >= 30) {
+            // Light icons on the dark block screen (the system may ignore this for overlay windows).
+            windowInsetsController?.setSystemBarsAppearance(
+                0,
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+            )
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             findOnBackInvokedDispatcher()?.registerOnBackInvokedCallback(
                 OnBackInvokedDispatcher.PRIORITY_OVERLAY, backCallback as OnBackInvokedCallback,
