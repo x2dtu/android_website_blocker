@@ -72,9 +72,13 @@ class NightBlockerService : AccessibilityService() {
 
     private fun refresh() {
         if (!::detector.isInitialized) return
+        // While the block screen is up, the window list is unreliable: during the switch to it,
+        // Android can briefly report no app or the launcher, which looked like the user leaving
+        // and closed the block screen. Trust only screen off / lock here; actually leaving
+        // (Home, Recents, another app, a call) stops the block screen, which calls refresh()
+        // again via onHiddenWhileBlocking once it's no longer covering.
+        if (BlockScreenHost.coversForeground() && detector.screenUsable()) return
         val foreground = detector.detect()
-        // Our block screen covers the blocked app; that's not the user switching to Night Blocker.
-        if (foreground?.packageName == packageName && BlockScreenHost.coversForeground()) return
         if (ForegroundMonitor.report(foreground, System.currentTimeMillis())) {
             controller?.onForegroundChanged(foreground)
         }

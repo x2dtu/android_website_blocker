@@ -20,9 +20,12 @@ object BlockScreenHost {
     /** The activity stopped while still supposed to be blocking (e.g. user switched away). */
     @Volatile var onHiddenWhileBlocking: () -> Unit = {}
 
-    /** True between the activity's onStart and onStop. */
+    /** True between the activity's onStart and onStop. Starting also ends the launch window. */
     @Volatile var visible = false
-        internal set
+        internal set(value) {
+            field = value
+            if (value) launchPendingUntil = 0
+        }
 
     @Volatile private var launchPendingUntil = 0L
 

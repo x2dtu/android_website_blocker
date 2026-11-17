@@ -27,7 +27,7 @@ class BlockActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-        noTransition(open = true)
+        noTransitions()
         setContent {
             val model by BlockScreenHost.model.collectAsState()
             BackHandler { BlockScreenHost.onLeave() }
@@ -53,14 +53,19 @@ class BlockActivity : ComponentActivity() {
 
     private fun finishQuietly() {
         finish()
-        noTransition(open = false)
+        if (Build.VERSION.SDK_INT < 34) {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
     }
 
-    @Suppress("DEPRECATION")
-    private fun noTransition(open: Boolean) {
+    /** No slide in/out: the block screen should just appear and disappear. */
+    private fun noTransitions() {
         if (Build.VERSION.SDK_INT >= 34) {
-            overrideActivityTransition(if (open) OVERRIDE_TRANSITION_OPEN else OVERRIDE_TRANSITION_CLOSE, 0, 0)
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
         } else {
+            @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
         }
     }

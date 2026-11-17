@@ -29,8 +29,11 @@ class ForegroundDetector(private val service: AccessibilityService) {
      */
     private var lastChromeHost: String? = null
 
+    /** Screen on and unlocked. */
+    fun screenUsable(): Boolean = power.isInteractive && !keyguard.isKeyguardLocked
+
     fun detect(): Foreground? {
-        if (!power.isInteractive || keyguard.isKeyguardLocked) return null
+        if (!screenUsable()) return null
         val appWindows = service.windows.filter {
             it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.title?.toString() != BlockOverlay.OVERLAY_WINDOW_TITLE
         }
