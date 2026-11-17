@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
@@ -72,6 +73,11 @@ class NightBlockerService : AccessibilityService() {
         if (ForegroundMonitor.report(foreground, System.currentTimeMillis())) {
             controller?.onForegroundChanged(foreground)
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        controller?.onConfigurationChanged()
     }
 
     override fun onInterrupt() {

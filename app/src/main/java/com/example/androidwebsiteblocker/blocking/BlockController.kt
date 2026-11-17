@@ -64,6 +64,8 @@ class BlockController(private val service: AccessibilityService, private val sto
         overlay.hide()
     }
 
+    fun onConfigurationChanged() = overlay.relayout()
+
     fun onForegroundChanged(foreground: Foreground?) {
         handle(engine.onForegroundChanged(foreground, now()))
     }
@@ -102,21 +104,24 @@ class BlockController(private val service: AccessibilityService, private val sto
         service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
     }
 
-    /** True when what's blocked is the site, not the browser app itself. */
+    /**
+     * True when a website is part of what's blocked (hard or soft) and a new tab would actually
+     * get you out — i.e. Chrome itself isn't hard-blocked or out of opens. If Chrome is only
+     * soft-blocked, the new tab may show Chrome's own soft block screen, which is fine.
+     */
     private fun isWebsiteBlock(fg: Foreground): Boolean {
         if (fg.packageName != CHROME_PACKAGE || fg.host == null) return false
-        val target = when (val d = engine.evaluate(fg, now())) {
-            is Decision.Blocked -> d.primary.target
-            is Decision.SoftGate -> d.primary.target
+        val targets = when (val d = engine.evaluate(fg, now())) {
+            is Decision.Blocked -> d.blockers.map { it.target }
+            is Decision.SoftGate -> d.gates.map { it.target }
             else -> return false
         }
-        // If Chrome itself is blocked too, a new tab wouldn't help.
-        return target is Target.Website && engine.evaluate(Foreground(CHROME_PACKAGE), now()) == Decision.Allow
+        return targets.any { it is Target.Website } && engine.evaluate(Foreground(CHROME_PACKAGE), now()) !is Decision.Blocked
     }
 
     private fun openSafeTab(): Boolean {
         val host = SAFE_TAB_URL.toUri().host
-        if (engine.evaluate(Foreground(CHROME_PACKAGE, host), now()) != Decision.Allow) return false
+        if (engine.evaluate(Foreground(CHROME_PACKAGE, host), now()) is Decision.Blocked) return false
         val intent = Intent(Intent.ACTION_VIEW, SAFE_TAB_URL.toUri()).apply {
             setPackage(CHROME_PACKAGE)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -183,8 +188,15 @@ class BlockController(private val service: AccessibilityService, private val sto
                     targetLabel = label(gate.target, fg),
                     message = set.message,
                     streakDays = state.streakOf(set.id).days,
-                    reasons = decision.gates.map { it.setName }.distinct().let { names ->
-                        if (names.size > 1) listOf("Soft blocks: ${names.joinToString(", ")}") else emptyList()
+                    // With several soft sets (e.g. Chrome + reddit.com), Continue uses an open from each —
+                    // list them so that's never a surprise.
+                    reasons = if (decision.gates.size > 1) {
+                        listOf("Continue uses an open from each:") + decision.gates.map { g ->
+                            val left = g.maxOpens?.let { "${it - g.opensUsed} of $it opens left" } ?: "unlimited opens"
+                            "• ${g.setName} (${label(g.target, fg)}): $left"
+                        }
+                    } else {
+                        emptyList()
                     },
                     soft = SoftGateInfo(
                         unlockDelay = decision.unlockDelay,

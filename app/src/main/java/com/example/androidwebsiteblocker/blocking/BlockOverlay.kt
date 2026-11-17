@@ -4,7 +4,9 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.view.Gravity
 import android.view.KeyEvent
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
@@ -22,7 +24,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 /**
  * Full-screen block screen drawn over the blocked app using an accessibility overlay window
- * (no "draw over other apps" permission needed). Back always goes home.
+ * (no "draw over other apps" permission needed). The navigation bar stays visible; Back leaves
+ * (home, or a new tab for websites).
  */
 class BlockOverlay(
     private val service: AccessibilityService,
@@ -49,12 +52,39 @@ class BlockOverlay(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            0,
             PixelFormat.OPAQUE,
         )
+        applyNavBarGap(params)
         windowManager.addView(v, params)
         view = v
         owner = o
+    }
+
+    /** Re-fit around the navigation bar after rotation. */
+    fun relayout() {
+        val v = view ?: return
+        val params = v.layoutParams as WindowManager.LayoutParams
+        applyNavBarGap(params)
+        windowManager.updateViewLayout(v, params)
+    }
+
+    /**
+     * Keeps the navigation bar (Back / Home / Recents) visible and usable — accessibility overlays
+     * otherwise draw on top of it. Two layers: ask the system to fit the window around the bar,
+     * and also size it explicitly from the current insets in case the system doesn't apply bar
+     * insets to overlay windows. Back on the bar still means "leave".
+     */
+    private fun applyNavBarGap(params: WindowManager.LayoutParams) {
+        if (Build.VERSION.SDK_INT < 30) return
+        params.fitInsetsTypes = WindowInsets.Type.navigationBars()
+        val metrics = windowManager.currentWindowMetrics
+        val nav = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = nav.left
+        params.y = 0
+        params.width = metrics.bounds.width() - nav.left - nav.right
+        params.height = metrics.bounds.height() - nav.bottom
     }
 
     fun hide() {
