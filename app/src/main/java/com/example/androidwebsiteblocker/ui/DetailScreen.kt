@@ -31,13 +31,20 @@ import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.Target
+import com.example.androidwebsiteblocker.core.policy.SoftUsage
+import com.example.androidwebsiteblocker.core.policy.UsageKey
 import com.example.androidwebsiteblocker.core.policy.formatDuration
 import com.example.androidwebsiteblocker.core.protection.SuspensionCheck
 import com.example.androidwebsiteblocker.core.protection.SuspensionPolicy
 import com.example.androidwebsiteblocker.core.schedule.groupWindows
 import com.example.androidwebsiteblocker.core.storage.AppState
 import com.example.androidwebsiteblocker.core.storage.streakOf
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** PIN-protected actions on one block set. */
 enum class SetAction(val pinTitle: String) {
@@ -121,6 +128,7 @@ fun DetailScreen(
         }
 
         if (set.mode == BlockMode.SOFT) {
+            UsageSection(set, state, now, zone)
             SectionCard("Soft block limits", subtitle = "Per app or site, reset each window") {
                 val l = set.softLimits
                 LimitRow("Wait before Continue unlocks", if (l.unlockDelay.isZero) "None" else formatDuration(l.unlockDelay))
@@ -189,3 +197,64 @@ private fun pauseText(check: SuspensionCheck, set: BlockSet, zone: ZoneId): Stri
     is SuspensionCheck.LimitReached -> "All ${check.max} pauses used this window."
     is SuspensionCheck.CoolingDown -> "Next pause available at ${formatInstantSeconds(check.until, zone)}."
 }
+
+/**
+ * Live usage for the current window: per app/site, every open with its start time and on-screen
+ * duration, plus what's left. Lets you check the counting against what you remember doing.
+ */
+@Composable
+private fun UsageSection(set: BlockSet, state: AppState, now: Instant, zone: ZoneId) {
+    val context = LocalContext.current
+    val occurrence = set.schedule.occurrenceAt(now, zone)
+    SectionCard(
+        "This window's usage",
+        subtitle = occurrence?.let { "Since ${it.start.format(USAGE_TIME)} · resets when the next window starts" },
+        info = "Each app and site has its own count. Time is only counted while it's actually on screen after you tap Continue — " +
+            "not on the block screen, with the screen off, or during the grace period.\n\n" +
+            "If an app is in more than one soft block set (like Chrome and a website you open in it), time and opens " +
+            "count against each set.",
+    ) {
+        if (occurrence == null || !set.enabled) {
+            Hint("Usage shows up here while the block set is on.")
+            return@SectionCard
+        }
+        val l = set.softLimits
+        set.targets.sortedBy { it is Target.Website }.forEach { target ->
+            val u = state.usage[UsageKey(set.id, target, occurrence.key)] ?: SoftUsage()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TargetIcon(target, 32.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(targetLabel(context, target), style = MaterialTheme.typography.bodyLarge)
+                    Hint(
+                        listOfNotNull(
+                            l.maxOpens?.let { "${(it - u.opensUsed).coerceAtLeast(0)} of $it opens left" } ?: "${u.opensUsed} opens",
+                            l.totalLimit?.let { "${formatDuration((it - u.timeUsed).coerceAtLeast(Duration.ZERO))} of ${formatDuration(it)} left" }
+                                ?: "${formatDuration(u.timeUsed)} used",
+                        ).joinToString(" · "),
+                    )
+                }
+            }
+            val live = u.session?.let { s ->
+                (s.leftAt == null || Duration.between(s.leftAt, now) <= l.graceTime) &&
+                    (l.perOpenLimit == null || s.used < l.perOpenLimit)
+            } == true
+            u.opens.forEachIndexed { i, open ->
+                val current = live && i == u.opens.lastIndex
+                val perOpen = l.perOpenLimit
+                val tail = when {
+                    current && perOpen != null -> " · open now, ${formatDuration(perOpen - open.used)} left"
+                    current -> " · open now"
+                    else -> ""
+                }
+                Text(
+                    "Open ${i + 1} · ${LocalDateTime.ofInstant(open.startedAt, zone).format(USAGE_TIME)} · ${formatDuration(open.used)}$tail",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (current) set.colorArgb.asColor() else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 44.dp),
+                )
+            }
+        }
+    }
+}
+
+private val USAGE_TIME = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
