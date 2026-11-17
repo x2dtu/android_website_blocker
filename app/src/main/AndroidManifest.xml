@@ -2,9 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- "Display over other apps": lets the block screen fill the whole screen under the system bars. -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
     <!-- Lets the app ask to be exempt from battery optimization so Samsung doesn't put it to sleep. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
@@ -37,6 +34,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Block screen. Own task + excluded from Recents so it never shows up as an app to switch
+            to; finishing it returns to whatever was underneath (after Continue).
+        -->
+        <activity
+            android:name=".blocking.BlockActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.block"
+            android:theme="@style/Theme.AndroidWebsiteBlocker.Block" />
 
         <!--
             Only the system may bind to an accessibility service (BIND_ACCESSIBILITY_SERVICE),

@@ -43,7 +43,7 @@ class BlockController(private val service: AccessibilityService, private val sto
     private val handler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tickRunnable = Runnable { tick() }
-    private val overlay = BlockOverlay(service, onGoHome = ::leave, onContinue = ::unlock)
+    private val overlay = BlockPresenter(service, onLeave = ::leave, onContinue = ::unlock)
 
     private var zone: ZoneId = ZoneId.systemDefault()
     private var engine = BlockEngine(zone, store.state.value.sets, store.state.value.usage)

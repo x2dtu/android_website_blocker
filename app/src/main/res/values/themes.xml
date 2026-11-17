@@ -2,4 +2,10 @@
 <resources>
 
     <style name="Theme.AndroidWebsiteBlocker" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Block screen: dark from the first frame (no white flash) and no open/close animation. -->
+    <style name="Theme.AndroidWebsiteBlocker.Block" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/block_background</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

@@ -57,7 +57,6 @@ class MainActivity : ComponentActivity() {
     /** Re-checked on every resume, since the user enables the service in Settings and comes back. */
     private val serviceEnabled = mutableStateOf(false)
     private val batteryExempt = mutableStateOf(true)
-    private val canDrawOverlays = mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,7 +68,7 @@ class MainActivity : ComponentActivity() {
                     // Edge-to-edge: pad for the keyboard so focused fields (e.g. PIN) scroll into view
                     // instead of sitting under it.
                     Column(Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).imePadding()) {
-                        AppRoot(store, serviceEnabled.value, batteryExempt.value, canDrawOverlays.value)
+                        AppRoot(store, serviceEnabled.value, batteryExempt.value)
                     }
                 }
             }
@@ -80,7 +79,6 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         serviceEnabled.value = isServiceEnabled(this)
         batteryExempt.value = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
-        canDrawOverlays.value = Settings.canDrawOverlays(this)
     }
 }
 
@@ -94,7 +92,7 @@ fun isServiceEnabled(context: Context): Boolean {
 
 /** Screens: "home", "log", "new", "set:<id>", "edit:<id>". A string so it survives rotation. */
 @Composable
-private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: Boolean, canDrawOverlays: Boolean) {
+private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: Boolean) {
     val context = LocalContext.current
     val state by store.state.collectAsState()
     val connected by ForegroundMonitor.serviceConnected.collectAsState()
@@ -175,12 +173,7 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
             state = state,
             serviceOk = serviceEnabled && connected,
             statusCard = { ServiceStatusCard(serviceEnabled, connected) },
-            setupCard = if (batteryExempt && canDrawOverlays) null else ({
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (!canDrawOverlays) OverlayCard()
-                    if (!batteryExempt) BatteryCard()
-                }
-            }),
+            setupCard = if (batteryExempt) null else ({ BatteryCard() }),
             onOpenSet = { screen = "set:$it" },
             onCreate = { screen = "new" },
             onOpenLog = { screen = "log" },
@@ -192,27 +185,6 @@ private fun changeMessage(outcome: ChangeOutcome?, zone: ZoneId): String = when 
     is ChangeOutcome.ApplyNow -> "Saved — in effect now"
     is ChangeOutcome.Pending -> "This blocks less, so it takes effect at ${formatInstant(outcome.change.appliesAt, zone)}. You can cancel it until then."
     null -> "Nothing changed"
-}
-
-/** Full-screen block screen needs "Display over other apps"; without it we fall back to a smaller one. */
-@Composable
-private fun OverlayCard() {
-    val context = LocalContext.current
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Full-screen block screen", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Allow \"Display over other apps\" so the block screen covers the whole screen, with the time, battery " +
-                    "and navigation bar (Back / Home / Recents) shown on top and still usable.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Button(onClick = {
-                context.startActivity(
-                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", context.packageName, null)),
-                )
-            }) { Text("Allow") }
-        }
-    }
 }
 
 /** Samsung can put apps to sleep; an exemption keeps blocking reliable. */

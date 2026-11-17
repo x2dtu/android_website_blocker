@@ -10,6 +10,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
 import com.example.androidwebsiteblocker.blocking.BlockController
+import com.example.androidwebsiteblocker.blocking.BlockScreenHost
 import com.example.androidwebsiteblocker.data.StateStore
 
 const val TAG = "NightBlocker"
@@ -49,6 +50,8 @@ class NightBlockerService : AccessibilityService() {
         }
         ContextCompat.registerReceiver(this, timeReceiver, timeFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
         controller = BlockController(this, StateStore.get(this)).also { it.start() }
+        // If the block screen gets covered (user switched apps), re-check what's really on screen.
+        BlockScreenHost.onHiddenWhileBlocking = { refresh() }
         ForegroundMonitor.setServiceConnected(true)
         // Always hand the new controller the current foreground, even if the monitor already
         // has it (service restarted while the same app stayed on screen).
@@ -70,6 +73,8 @@ class NightBlockerService : AccessibilityService() {
     private fun refresh() {
         if (!::detector.isInitialized) return
         val foreground = detector.detect()
+        // Our block screen covers the blocked app; that's not the user switching to Night Blocker.
+        if (foreground?.packageName == packageName && BlockScreenHost.coversForeground()) return
         if (ForegroundMonitor.report(foreground, System.currentTimeMillis())) {
             controller?.onForegroundChanged(foreground)
         }
