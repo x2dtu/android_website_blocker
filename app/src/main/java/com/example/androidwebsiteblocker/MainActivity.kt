@@ -15,6 +15,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -63,7 +65,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             AndroidWebsiteBlockerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Column(Modifier.padding(innerPadding)) {
+                    // Edge-to-edge: pad for the keyboard so focused fields (e.g. PIN) scroll into view
+                    // instead of sitting under it.
+                    Column(Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).imePadding()) {
                         AppRoot(store, serviceEnabled.value, batteryExempt.value)
                     }
                 }

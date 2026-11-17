@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.BlockMode
@@ -159,6 +160,7 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             OutlinedTextField(
                 draft.name, { draft.name = it }, label = { Text("Name") }, placeholder = { Text("e.g. Bedtime, Work focus") },
                 singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SET_COLORS.forEach { c ->
@@ -279,6 +281,7 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             OutlinedTextField(
                 draft.message, { draft.message = it }, placeholder = { Text("e.g. Future you will thank you. Go to sleep.") },
                 shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
         }
 
