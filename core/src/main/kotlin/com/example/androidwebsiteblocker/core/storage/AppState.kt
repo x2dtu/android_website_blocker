@@ -5,6 +5,7 @@ import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
+import com.example.androidwebsiteblocker.core.policy.OpenRecord
 import com.example.androidwebsiteblocker.core.policy.OpenSession
 import com.example.androidwebsiteblocker.core.policy.SoftUsage
 import com.example.androidwebsiteblocker.core.policy.UsageKey
@@ -101,7 +102,11 @@ private data class UsageDto(
     val timeUsedMs: Long,
     val sessionUsedMs: Long? = null,
     val sessionLeftAt: Long? = null,
+    val opens: List<OpenDto> = emptyList(),
 )
+
+@Serializable
+private data class OpenDto(val startedAt: Long, val usedMs: Long)
 
 @Serializable
 private data class SuspensionDto(val setId: String, val occurrence: String, val used: Int, val lastEndsAt: Long?)
@@ -121,7 +126,8 @@ private fun AppState.toDto() = StateDto(
     sets = sets.map { it.toDto() },
     usage = usage.map { (k, u) ->
         UsageDto(k.setId, k.target.toDto(), k.occurrenceKey, u.opensUsed, u.timeUsed.toMillis(),
-            u.session?.used?.toMillis(), u.session?.leftAt?.toEpochMilli())
+            u.session?.used?.toMillis(), u.session?.leftAt?.toEpochMilli(),
+            u.opens.map { OpenDto(it.startedAt.toEpochMilli(), it.used.toMillis()) })
     },
     suspensions = suspensions.map { (id, s) -> SuspensionDto(id, s.occurrenceKey, s.used, s.lastEndsAt?.toEpochMilli()) },
     pendingChanges = pendingChanges.values.map { PendingDto(it.proposed.toDto(), it.requestedAt.toEpochMilli(), it.appliesAt.toEpochMilli()) },
@@ -136,6 +142,7 @@ private fun StateDto.toDomain() = AppState(
             opensUsed = u.opensUsed,
             timeUsed = Duration.ofMillis(u.timeUsedMs),
             session = u.sessionUsedMs?.let { OpenSession(Duration.ofMillis(it), u.sessionLeftAt?.let(Instant::ofEpochMilli)) },
+            opens = u.opens.map { OpenRecord(Instant.ofEpochMilli(it.startedAt), Duration.ofMillis(it.usedMs)) },
         )
     },
     suspensions = suspensions.associate { it.setId to SuspensionState(it.occurrence, it.used, it.lastEndsAt?.let(Instant::ofEpochMilli)) },

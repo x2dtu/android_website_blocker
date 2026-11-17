@@ -16,10 +16,15 @@ data class UsageKey(val setId: String, val target: Target, val occurrenceKey: St
 /** The current soft-block open. [leftAt] is set while the user is away from the target (grace period). */
 data class OpenSession(val used: Duration = Duration.ZERO, val leftAt: Instant? = null)
 
+/** One open, for the usage history screen. [used] is on-screen time, so it excludes grace gaps. */
+data class OpenRecord(val startedAt: Instant, val used: Duration = Duration.ZERO)
+
 data class SoftUsage(
     val opensUsed: Int = 0,
     val timeUsed: Duration = Duration.ZERO,
     val session: OpenSession? = null,
+    /** Every open this window, oldest first. The last one is the current open if [session] is live. */
+    val opens: List<OpenRecord> = emptyList(),
 )
 
 /**
@@ -98,7 +103,7 @@ class BlockEngine(
             val key = pair.key
             val u = _usage[key] ?: SoftUsage()
             if (liveSession(u, pair.set.softLimits, now) != null) continue
-            _usage[key] = u.copy(opensUsed = u.opensUsed + 1, session = OpenSession())
+            _usage[key] = u.copy(opensUsed = u.opensUsed + 1, session = OpenSession(), opens = u.opens + OpenRecord(now))
         }
         return evaluate(fg, now)
     }
@@ -197,6 +202,7 @@ class BlockEngine(
             _usage[pair.key] = u.copy(
                 timeUsed = u.timeUsed + elapsed,
                 session = session.copy(used = session.used + elapsed),
+                opens = u.opens.dropLast(1) + (u.opens.lastOrNull()?.let { it.copy(used = it.used + elapsed) } ?: OpenRecord(from, elapsed)),
             )
         }
     }

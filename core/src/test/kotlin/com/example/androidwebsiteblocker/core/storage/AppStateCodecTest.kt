@@ -5,6 +5,7 @@ import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
+import com.example.androidwebsiteblocker.core.policy.OpenRecord
 import com.example.androidwebsiteblocker.core.policy.OpenSession
 import com.example.androidwebsiteblocker.core.policy.SoftUsage
 import com.example.androidwebsiteblocker.core.policy.UsageKey
@@ -43,7 +44,8 @@ class AppStateCodecTest {
         sets = listOf(soft, hard),
         usage = mapOf(
             UsageKey("s1", Target.Website("reddit.com"), "2026-11-14T23:00") to
-                SoftUsage(2, Duration.ofMinutes(5), OpenSession(Duration.ofSeconds(30), now)),
+                SoftUsage(2, Duration.ofMinutes(5), OpenSession(Duration.ofSeconds(30), now),
+                    listOf(OpenRecord(now.minusSeconds(600), Duration.ofMinutes(4)), OpenRecord(now.minusSeconds(60), Duration.ofSeconds(30)))),
             UsageKey("s1", Target.App("com.instagram.android"), "2026-11-14T23:00") to SoftUsage(1, Duration.ofMinutes(1)),
         ),
         suspensions = mapOf("s1" to SuspensionState("2026-11-14T23:00", 1, now)),
