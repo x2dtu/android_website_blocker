@@ -1,5 +1,6 @@
 package com.example.androidwebsiteblocker.blocking
 
+import android.os.SystemClock
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -163,11 +164,15 @@ private fun SoftControls(
     if (soft.limitsSummary.isNotBlank()) {
         Text(soft.limitsSummary, color = Muted, style = MaterialTheme.typography.bodySmall)
     }
-    var secondsLeft by remember(resetKey) { mutableLongStateOf(soft.unlockDelay.seconds) }
+    // Count down to a fixed deadline rather than subtracting 1 per tick, so a stall (busy phone)
+    // can't make the number lag or the unlock late. Uptime clock: unaffected by clock changes.
+    val deadline = remember(resetKey) { SystemClock.elapsedRealtime() + soft.unlockDelay.toMillis() }
+    fun remaining() = ((deadline - SystemClock.elapsedRealtime() + 999) / 1000).coerceAtLeast(0)
+    var secondsLeft by remember(resetKey) { mutableLongStateOf(remaining()) }
     LaunchedEffect(resetKey) {
         while (secondsLeft > 0) {
-            delay(1000)
-            secondsLeft--
+            delay(200)
+            secondsLeft = remaining()
         }
     }
     Button(
