@@ -27,6 +27,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +53,7 @@ import com.example.androidwebsiteblocker.core.policy.findOverlaps
 import com.example.androidwebsiteblocker.core.protection.PinHasher
 import com.example.androidwebsiteblocker.core.schedule.DayWindow
 import com.example.androidwebsiteblocker.core.schedule.WeeklySchedule
+import com.example.androidwebsiteblocker.data.AdultSiteList
 import java.time.Duration
 import java.util.UUID
 import kotlinx.coroutines.delay
@@ -198,7 +200,7 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             info = "Apps are blocked whenever they're on screen. Websites are blocked in Chrome, including all their subdomains " +
                 "(reddit.com also covers old.reddit.com). When a website is blocked, leaving opens a new tab so your other tabs stay put.",
         ) {
-            draft.targets.forEach { t ->
+            draft.targets.filter { it != Target.AdultWebsites }.forEach { t ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TargetIcon(t, 36.dp)
                     Column(Modifier.weight(1f)) {
@@ -208,6 +210,12 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                     TextButton(onClick = { draft.targets = draft.targets - t }) { Text("Remove") }
                 }
             }
+            AdultSitesToggle(
+                checked = Target.AdultWebsites in draft.targets,
+                onChange = { on ->
+                    draft.targets = if (on) draft.targets + Target.AdultWebsites else draft.targets - Target.AdultWebsites
+                },
+            )
             FilledTonalButton(onClick = { picking = true }) { Text("+ Choose apps") }
             WebsiteAdder { domain -> if (Target.Website(domain) !in draft.targets) draft.targets = draft.targets + Target.Website(domain) }
         }
@@ -345,6 +353,25 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text(if (original == null) "Create block set" else "Save changes") }
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun AdultSitesToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        BadgeIcon("18+", 36.dp)
+        Column(Modifier.weight(1f)) {
+            Text("Block adult websites", style = MaterialTheme.typography.bodyLarge)
+            Hint("${AdultSiteList.approxSizeLabel()} known sites, in Chrome")
+        }
+        InfoButton(
+            "Block adult websites",
+            "Blocks every site on a bundled list of ${AdultSiteList.approxSizeLabel()} adult domains (and their subdomains), " +
+                "from The Block List Project, last updated ${AdultSiteList.LIST_DATE}. They count as one item for soft-block limits.\n\n" +
+                "Works in Chrome only. To close the gap, add other browsers (Samsung Internet, Firefox, …) as apps " +
+                "in a hard block set. Brand-new sites may not be on the list yet.",
+        )
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

@@ -195,10 +195,12 @@ private fun SetDto.toDomain() = BlockSet(
 private fun Target.toDto() = when (this) {
     is Target.App -> TargetDto("app", packageName)
     is Target.Website -> TargetDto("web", domain)
+    Target.AdultWebsites -> TargetDto("adult", "")
 }
 
 private fun TargetDto.toDomain(): Target = when (type) {
     "app" -> Target.App(value)
     "web" -> Target.Website(value)
+    "adult" -> Target.AdultWebsites
     else -> error("Unknown target type: $type")
 }

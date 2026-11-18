@@ -119,7 +119,7 @@ fun DetailScreen(
         }
 
         SectionCard("Blocks", subtitle = "${set.targets.size} apps and websites") {
-            set.targets.sortedBy { it is Target.Website }.forEach { t ->
+            set.targets.sortedBy { it !is Target.App }.forEach { t ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TargetIcon(t, 36.dp)
                     Text(targetLabel(context, t), style = MaterialTheme.typography.bodyLarge)
@@ -219,7 +219,7 @@ private fun UsageSection(set: BlockSet, state: AppState, now: Instant, zone: Zon
             return@SectionCard
         }
         val l = set.softLimits
-        set.targets.sortedBy { it is Target.Website }.forEach { target ->
+        set.targets.sortedBy { it !is Target.App }.forEach { target ->
             val u = state.usage[UsageKey(set.id, target, occurrence.key)] ?: SoftUsage()
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TargetIcon(target, 32.dp)

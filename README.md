@@ -18,3 +18,9 @@ Open the app and follow the status card. Manually:
 
 ## Checking detection
 Logcat tag `NightBlocker` logs every foreground change; the app's home screen shows the same log with durations.
+
+## Adult-site list
+"Block adult websites" uses `app/src/main/assets/adult_domains.bin`, built from
+[The Block List Project](https://github.com/blocklistproject/Lists) porn list (public domain / MIT).
+To refresh it, download the list and run `tools/build_domain_list.py` (instructions in the script),
+then update `AdultSiteList.LIST_DATE`.

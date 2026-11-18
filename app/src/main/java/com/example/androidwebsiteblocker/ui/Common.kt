@@ -73,6 +73,7 @@ fun appLabel(context: Context, packageName: String): String = try {
 fun targetLabel(context: Context, target: Target): String = when (target) {
     is Target.App -> appLabel(context, target.packageName)
     is Target.Website -> target.domain
+    Target.AdultWebsites -> "Adult websites"
 }
 
 private val iconCache = LruCache<String, ImageBitmap>(200)
@@ -82,6 +83,7 @@ fun TargetIcon(target: Target, size: Dp = 32.dp) {
     when (target) {
         is Target.App -> AppIcon(target.packageName, size)
         is Target.Website -> LetterIcon(target.domain, size)
+        Target.AdultWebsites -> BadgeIcon("18+", size)
     }
 }
 
@@ -103,6 +105,17 @@ fun AppIcon(packageName: String, size: Dp = 32.dp) {
     val bitmap = icon
     if (bitmap != null) Image(bitmap, contentDescription = null, modifier = Modifier.size(size))
     else LetterIcon(packageName.substringAfterLast('.'), size)
+}
+
+/** Text badge in a circle, e.g. "18+". */
+@Composable
+fun BadgeIcon(text: String, size: Dp = 32.dp) {
+    Box(
+        Modifier.size(size).background(MaterialTheme.colorScheme.errorContainer, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = MaterialTheme.colorScheme.onErrorContainer, fontSize = (size.value * 0.32f).sp)
+    }
 }
 
 /** Placeholder for websites (no favicons yet — that would need network access). */

@@ -15,9 +15,16 @@ sealed interface Target {
         }
     }
 
+    /**
+     * Every site on the bundled adult-site list ([AdultSites]). Acts as one target, so soft-block
+     * limits are shared across all of them.
+     */
+    data object AdultWebsites : Target
+
     fun matches(foreground: Foreground): Boolean = when (this) {
         is App -> foreground.packageName == packageName
         is Website -> foreground.host?.let { it == domain || it.endsWith(".$domain") } == true
+        AdultWebsites -> foreground.host?.let(AdultSites::contains) == true
     }
 }
 

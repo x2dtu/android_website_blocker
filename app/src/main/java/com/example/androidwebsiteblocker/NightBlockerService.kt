@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
 import com.example.androidwebsiteblocker.blocking.BlockController
 import com.example.androidwebsiteblocker.blocking.BlockScreenHost
+import com.example.androidwebsiteblocker.data.AdultSiteList
 import com.example.androidwebsiteblocker.data.StateStore
 
 const val TAG = "NightBlocker"
@@ -49,6 +50,7 @@ class NightBlockerService : AccessibilityService() {
             addAction(Intent.ACTION_TIME_CHANGED)
         }
         ContextCompat.registerReceiver(this, timeReceiver, timeFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        AdultSiteList.ensureLoaded(this)
         controller = BlockController(this, StateStore.get(this)).also { it.start() }
         // If the block screen gets covered (user switched apps), re-check what's really on screen.
         BlockScreenHost.onHiddenWhileBlocking = { refresh() }

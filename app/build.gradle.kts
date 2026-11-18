@@ -34,6 +34,9 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        noCompress += "bin"
+    }
     testOptions {
         // JVM unit tests touch android.util.Log only on error paths; return defaults instead of throwing.
         unitTests.isReturnDefaultValues = true

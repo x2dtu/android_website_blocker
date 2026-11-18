@@ -116,7 +116,7 @@ class BlockController(private val service: AccessibilityService, private val sto
             is Decision.SoftGate -> d.gates.map { it.target }
             else -> return false
         }
-        return targets.any { it is Target.Website } && engine.evaluate(Foreground(CHROME_PACKAGE), now()) !is Decision.Blocked
+        return targets.any { it is Target.Website || it == Target.AdultWebsites } && engine.evaluate(Foreground(CHROME_PACKAGE), now()) !is Decision.Blocked
     }
 
     private fun openSafeTab(): Boolean {
@@ -215,6 +215,7 @@ class BlockController(private val service: AccessibilityService, private val sto
 
     private fun label(target: Target, fg: Foreground): String = when (target) {
         is Target.Website -> fg.host ?: target.domain
+        Target.AdultWebsites -> fg.host ?: "Adult website"
         is Target.App -> appLabel(target.packageName)
     }
 

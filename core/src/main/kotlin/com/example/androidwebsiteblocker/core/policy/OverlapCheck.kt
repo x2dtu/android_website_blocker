@@ -1,5 +1,6 @@
 package com.example.androidwebsiteblocker.core.policy
 
+import com.example.androidwebsiteblocker.core.model.AdultSites
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.schedule.WeekSpan
@@ -32,5 +33,8 @@ internal fun targetsOverlap(a: Target, b: Target): Boolean = when {
     a is Target.App && b is Target.App -> a.packageName == b.packageName
     a is Target.Website && b is Target.Website ->
         a.domain == b.domain || a.domain.endsWith(".${b.domain}") || b.domain.endsWith(".${a.domain}")
+    a == Target.AdultWebsites && b == Target.AdultWebsites -> true
+    a == Target.AdultWebsites && b is Target.Website -> AdultSites.contains(b.domain)
+    a is Target.Website && b == Target.AdultWebsites -> AdultSites.contains(a.domain)
     else -> false
 }

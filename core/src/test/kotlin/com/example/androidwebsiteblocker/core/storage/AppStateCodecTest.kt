@@ -29,7 +29,7 @@ class AppStateCodecTest {
 
     private val soft = BlockSet(
         id = "s1", name = "Night Socials", mode = BlockMode.SOFT,
-        targets = setOf(Target.App("com.instagram.android"), Target.Website("reddit.com")),
+        targets = setOf(Target.App("com.instagram.android"), Target.Website("reddit.com"), Target.AdultWebsites),
         schedule = WeeklySchedule(listOf(DayWindow(DayOfWeek.SUNDAY, 0, 480), DayWindow(DayOfWeek.SATURDAY, 1380, MINUTES_PER_DAY))),
         softLimits = SoftLimits(Duration.ofSeconds(10), 4, Duration.ofMinutes(3), Duration.ofMinutes(12), Duration.ofSeconds(20)),
         protection = ProtectionSettings(Duration.ofMinutes(2), null, Duration.ofSeconds(45), Duration.ofMinutes(7)),

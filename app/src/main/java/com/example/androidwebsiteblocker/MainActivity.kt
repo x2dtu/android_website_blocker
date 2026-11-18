@@ -41,6 +41,7 @@ import com.example.androidwebsiteblocker.core.protection.ChangeOutcome
 import com.example.androidwebsiteblocker.core.protection.SuspensionCheck
 import com.example.androidwebsiteblocker.core.storage.StateActions
 import com.example.androidwebsiteblocker.core.storage.setById
+import com.example.androidwebsiteblocker.data.AdultSiteList
 import com.example.androidwebsiteblocker.data.StateStore
 import com.example.androidwebsiteblocker.ui.DebugLogScreen
 import com.example.androidwebsiteblocker.ui.DetailScreen
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val store = StateStore.get(this)
+        AdultSiteList.ensureLoaded(this)
         setContent {
             AndroidWebsiteBlockerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
