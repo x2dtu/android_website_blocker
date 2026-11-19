@@ -142,12 +142,20 @@ class BlockController(private val service: AccessibilityService, private val sto
     private fun handle(decision: Decision) {
         val now = now()
         engine.foreground?.let { fg ->
-            // Several sets warning at once: show the most urgent.
-            engine.collectTimeWarnings(now).minByOrNull { it.threshold }?.let { w ->
-                val minutes = w.threshold.toMinutes()
-                val left = if (minutes == 1L) "1 minute left" else "$minutes minutes left"
-                val color = store.state.value.setById(w.setId)?.colorArgb ?: 0xFF9AAAFF
-                banner.show(concrete(w.setId, w.target, fg), "${label(w.target, fg)} · $left", w.setName, color)
+            // Collect both so each is marked as sent; a time warning beats a reminder.
+            val warning = engine.collectTimeWarnings(now).minByOrNull { it.threshold }
+            val reminder = engine.collectReminders(now).maxByOrNull { it.used }
+            fun colorOf(setId: String) = store.state.value.setById(setId)?.colorArgb ?: 0xFF9AAAFF
+            when {
+                warning != null -> {
+                    val minutes = warning.threshold.toMinutes()
+                    val left = if (minutes == 1L) "1 minute left" else "$minutes minutes left"
+                    banner.show(concrete(warning.setId, warning.target, fg), "${label(warning.target, fg)} · $left", warning.setName, colorOf(warning.setId))
+                }
+                reminder != null -> {
+                    val name = if (reminder.target == Target.WholeSet) reminder.setName else label(reminder.target, fg)
+                    banner.show(concrete(reminder.setId, reminder.target, fg), "$name · ${soFar(reminder.used)} so far", reminder.setName, colorOf(reminder.setId))
+                }
             }
         }
         store.update { if (it.usage == engine.usage) it else it.copy(usage = engine.usage) }
@@ -237,6 +245,17 @@ class BlockController(private val service: AccessibilityService, private val sto
         if (target != Target.WholeSet) return target
         val set = store.state.value.setById(setId)
         return set?.targets?.firstOrNull { it.matches(fg) } ?: Target.App(fg.packageName)
+    }
+
+    /** "15 minutes", "1 hour", "1 h 15 min". */
+    private fun soFar(d: Duration): String {
+        val h = d.toHours()
+        val m = d.toMinutes() % 60
+        return when {
+            h == 0L -> if (m == 1L) "1 minute" else "$m minutes"
+            m == 0L -> if (h == 1L) "1 hour" else "$h hours"
+            else -> "$h h $m min"
+        }
     }
 
     private fun appLabel(packageName: String): String = try {

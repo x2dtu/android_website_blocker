@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.DEFAULT_REMINDER_INTERVAL
 import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.policy.SoftUsage
@@ -87,12 +88,12 @@ fun DetailScreen(
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Pill(status.state.label(), status.state.color())
-                    Pill(if (set.mode == BlockMode.HARD) "Hard block" else "Soft block", accent)
+                    Pill(status.state.label(set.mode), status.state.color())
+                    Pill(set.mode.shortLabel(), accent)
                 }
                 Text(status.text, style = MaterialTheme.typography.titleLarge)
                 val streak = state.streakOf(set.id).days
-                Text(
+                if (set.mode != BlockMode.REMINDER) Text(
                     if (streak > 0) "🔥 $streak-day streak" else "No streak yet — get through a full window without pausing.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (streak > 0) accent else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -140,10 +141,19 @@ fun DetailScreen(
                 LimitRow("Time per open", l.perOpenLimit?.let(::formatDuration) ?: "No limit")
                 LimitRow("Total time", l.totalLimit?.let(::formatDuration) ?: "No limit")
                 LimitRow("Grace period", formatDuration(l.graceTime))
+                LimitRow("Usage reminders", l.reminderInterval?.let { "Every ${formatDuration(it)}" } ?: "Off")
             }
         }
 
-        SectionCard(
+        if (set.mode == BlockMode.REMINDER) {
+            UsageSection(set, state, now, zone)
+            SectionCard("Reminders") {
+                LimitRow("Remind me every", formatDuration(set.softLimits.reminderInterval ?: DEFAULT_REMINDER_INTERVAL))
+                LimitRow("Counting", if (set.limitScope == LimitScope.WHOLE_SET) "All apps together" else "Each app separately")
+            }
+        }
+
+        if (set.mode != BlockMode.REMINDER) SectionCard(
             "Emergency pause",
             info = "Pauses the whole block set for ${formatDuration(set.protection.suspensionDuration)}, then it turns itself back on. " +
                 "Needs your PIN, is limited per window, and resets your streak.",
@@ -230,7 +240,7 @@ private fun UsageSection(set: BlockSet, state: AppState, now: Instant, zone: Zon
                 TargetIcon(target, 32.dp)
                 Column(Modifier.weight(1f)) {
                     Text(targetLabel(context, target), style = MaterialTheme.typography.bodyLarge)
-                    Hint(
+                    if (set.mode == BlockMode.REMINDER) Hint("${formatDuration(u.timeUsed)} on screen this window") else Hint(
                         listOfNotNull(
                             l.maxOpens?.let { "${(it - u.opensUsed).coerceAtLeast(0)} of $it opens left" } ?: "${u.opensUsed} opens",
                             l.totalLimit?.let { "${formatDuration((it - u.timeUsed).coerceAtLeast(Duration.ZERO))} of ${formatDuration(it)} left" }

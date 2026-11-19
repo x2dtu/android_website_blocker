@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.DEFAULT_REMINDER_INTERVAL
 import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
 import com.example.androidwebsiteblocker.core.model.SoftLimits
@@ -77,6 +78,9 @@ private class Draft(set: BlockSet?) {
     var graceSec by mutableStateOf(soft.graceTime.seconds.toString())
     var timeWarnings by mutableStateOf(soft.timeWarnings)
     var limitScope by mutableStateOf(set?.limitScope ?: LimitScope.EACH_TARGET)
+    /** Soft sets: whether usage reminders are on. Reminder sets always remind. */
+    var softReminders by mutableStateOf(set?.mode == BlockMode.SOFT && soft.reminderInterval != null)
+    var reminderMin by mutableStateOf((soft.reminderInterval ?: DEFAULT_REMINDER_INTERVAL).toMinutes().toString())
 
     private val p = set?.protection ?: ProtectionSettings()
     var suspensionMin by mutableStateOf(p.suspensionDuration.toMinutes().toString())
@@ -102,13 +106,33 @@ private class Draft(set: BlockSet?) {
         if (name.isBlank()) errors += "Give the block set a name"
         if (targets.isEmpty()) errors += "Add at least one app or website"
         if (windows.isEmpty()) errors += "Add at least one time window"
+        val perOpen = num(perOpenMin, "Time per open", 1)
+        val total = num(totalMin, "Total time", 1)
+        val reminderInterval: Duration? = when {
+            mode == BlockMode.REMINDER || (mode == BlockMode.SOFT && softReminders) -> {
+                val m = num(reminderMin, "Reminder interval", 1)
+                if (m == null && reminderMin.isBlank()) errors += "Enter how often to remind you"
+                m?.let(Duration::ofMinutes)
+            }
+            else -> null
+        }
+        if (mode == BlockMode.SOFT && reminderInterval != null) {
+            // A reminder that can never come up would be confusing.
+            if (perOpen != null && reminderInterval >= Duration.ofMinutes(perOpen)) {
+                errors += "Reminder interval must be shorter than the time per open ($perOpen min)"
+            }
+            if (total != null && reminderInterval >= Duration.ofMinutes(total)) {
+                errors += "Reminder interval must be shorter than the total time ($total min)"
+            }
+        }
         val softLimits = SoftLimits(
             unlockDelay = Duration.ofSeconds(num(unlockDelaySec, "Unlock wait") ?: 0),
             maxOpens = num(maxOpens, "Opens allowed", 1)?.toInt(),
-            perOpenLimit = num(perOpenMin, "Time per open", 1)?.let(Duration::ofMinutes),
-            totalLimit = num(totalMin, "Total time", 1)?.let(Duration::ofMinutes),
+            perOpenLimit = perOpen?.let(Duration::ofMinutes),
+            totalLimit = total?.let(Duration::ofMinutes),
             graceTime = Duration.ofSeconds(num(graceSec, "Grace period") ?: 15),
             timeWarnings = timeWarnings,
+            reminderInterval = reminderInterval,
         )
         val protection = ProtectionSettings(
             suspensionDuration = Duration.ofMinutes(num(suspensionMin, "Emergency pause length", 1) ?: 1),
@@ -184,16 +208,22 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             info = "Hard block: during the schedule, the apps and sites can't be opened at all. The block screen only lets you leave.\n\n" +
                 "Soft block: you can still get in by tapping Continue on the block screen, but with the limits you choose below " +
                 "(a wait before Continue unlocks, a number of opens, and time limits).\n\n" +
-                "Need both for different apps? Make two block sets.",
+                "Reminder: never blocks. A small banner tells you how long you've been on an app every so often, " +
+                "e.g. \"Instagram · 30 minutes so far\".\n\n" +
+                "Need different rules for different apps? Make more block sets.",
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChoiceCard(
                     "Hard block", "No way in during the schedule.",
-                    draft.mode == BlockMode.HARD, { draft.mode = BlockMode.HARD }, Modifier.weight(1f),
+                    draft.mode == BlockMode.HARD, { draft.mode = BlockMode.HARD }, Modifier.fillMaxWidth(),
                 )
                 ChoiceCard(
                     "Soft block", "Let me in, with a wait and limits.",
-                    draft.mode == BlockMode.SOFT, { draft.mode = BlockMode.SOFT }, Modifier.weight(1f),
+                    draft.mode == BlockMode.SOFT, { draft.mode = BlockMode.SOFT }, Modifier.fillMaxWidth(),
+                )
+                ChoiceCard(
+                    "Reminder", "Never blocks — just tells me how long I've been on.",
+                    draft.mode == BlockMode.REMINDER, { draft.mode = BlockMode.REMINDER }, Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -253,26 +283,7 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                 "Soft block limits",
                 subtitle = "Everything resets when the next window starts.",
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Limits apply to", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                    InfoButton(
-                        "Limits apply to",
-                        "Each app separately: every app and site in this set gets its own opens and time — " +
-                            "10 opens means 10 for Instagram and 10 for TikTok.\n\n" +
-                            "All together: one shared pool for the whole set — 10 opens and 20 minutes across all of them. " +
-                            "Switching between apps in the set during an open keeps the same open.",
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ChoiceCard(
-                        "Each app separately", "Own opens and time per app or site.",
-                        draft.limitScope == LimitScope.EACH_TARGET, { draft.limitScope = LimitScope.EACH_TARGET }, Modifier.weight(1f),
-                    )
-                    ChoiceCard(
-                        "All together", "One shared pool for the whole set.",
-                        draft.limitScope == LimitScope.WHOLE_SET, { draft.limitScope = LimitScope.WHOLE_SET }, Modifier.weight(1f),
-                    )
-                }
+                LimitScopeChooser(draft.limitScope) { draft.limitScope = it }
                 NumberSetting(
                     "Wait before Continue unlocks", draft.unlockDelaySec, { draft.unlockDelaySec = it }, "sec",
                     hint = "0 = Continue is available right away",
@@ -318,10 +329,30 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                     )
                     Switch(checked = draft.timeWarnings, onCheckedChange = { draft.timeWarnings = it })
                 }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Usage reminders", style = MaterialTheme.typography.bodyLarge)
+                        Hint("\"N minutes so far\" banner while you're in the app")
+                    }
+                    InfoButton(
+                        "Usage reminders",
+                        "While you're using an app after tapping Continue, shows a small banner every so often with how long " +
+                            "you've spent on it this window. Must be shorter than the time per open and the total time.",
+                    )
+                    Switch(checked = draft.softReminders, onCheckedChange = { draft.softReminders = it })
+                }
+                if (draft.softReminders) ReminderIntervalField(draft.reminderMin) { draft.reminderMin = it }
             }
         }
 
-        SectionCard(
+        if (draft.mode == BlockMode.REMINDER) {
+            SectionCard("Reminders", subtitle = "Counts time on screen during the schedule; resets each window.") {
+                ReminderIntervalField(draft.reminderMin) { draft.reminderMin = it }
+                LimitScopeChooser(draft.limitScope, label = "Count time for") { draft.limitScope = it }
+            }
+        }
+
+        if (draft.mode != BlockMode.REMINDER) SectionCard(
             "Block screen message",
             info = "Shown in big letters every time this block set stops you. Write something that'll actually work on you at 1 AM.",
         ) {
@@ -333,18 +364,18 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
         }
 
         SectionCard("Safeguards", subtitle = "Make it harder to give in on impulse") {
-            NumberSetting(
+            if (draft.mode != BlockMode.REMINDER) NumberSetting(
                 "Emergency pause length", draft.suspensionMin, { draft.suspensionMin = it }, "min",
                 hint = "How long an emergency pause lasts",
                 info = "In a real emergency you can pause the whole block set with your PIN. It turns itself back on after this long. " +
                     "Pausing resets the streak.",
             )
-            NumberSetting(
+            if (draft.mode != BlockMode.REMINDER) NumberSetting(
                 "Emergency pauses allowed", draft.maxSuspensions, { draft.maxSuspensions = it }, "per window",
                 hint = "Resets when the next window starts", blankMeans = "Unlimited pauses",
                 info = "How many emergency pauses you get during one scheduled window.",
             )
-            NumberSetting(
+            if (draft.mode != BlockMode.REMINDER) NumberSetting(
                 "Wait between pauses", draft.cooldownSec, { draft.cooldownSec = it }, "sec",
                 hint = "After a pause ends",
                 info = "After an emergency pause ends, you have to wait this long before you can pause again, " +
@@ -393,6 +424,41 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
         ) { Text(if (original == null) "Create block set" else "Save changes") }
         Spacer(Modifier.height(32.dp))
     }
+}
+
+@Composable
+private fun LimitScopeChooser(scope: LimitScope, label: String = "Limits apply to", onChange: (LimitScope) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        InfoButton(
+            label,
+            "Each app separately: every app and site in this set gets its own opens and time — " +
+                "10 opens means 10 for Instagram and 10 for TikTok.\n\n" +
+                "All together: one shared pool for the whole set — e.g. 10 opens and 20 minutes across all of them, " +
+                "or one \"30 minutes so far\" for all your social apps combined. " +
+                "Switching between apps in the set keeps counting as the same use.",
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ChoiceCard(
+            "Each app separately", "Separate count per app or site.",
+            scope == LimitScope.EACH_TARGET, { onChange(LimitScope.EACH_TARGET) }, Modifier.weight(1f),
+        )
+        ChoiceCard(
+            "All together", "One shared count for the whole set.",
+            scope == LimitScope.WHOLE_SET, { onChange(LimitScope.WHOLE_SET) }, Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun ReminderIntervalField(value: String, onChange: (String) -> Unit) {
+    NumberSetting(
+        "Remind me every", value, onChange, "min",
+        hint = "Of time on screen",
+        info = "Each time you've used an app (or the whole set, if counted together) for another this-many minutes " +
+            "during the window, a banner shows how long you've been on it so far. Default 15 minutes.",
+    )
 }
 
 @Composable

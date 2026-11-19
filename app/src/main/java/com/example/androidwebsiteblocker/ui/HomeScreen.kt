@@ -91,8 +91,14 @@ fun SetState.color(): Color = when (this) {
     SetState.DISABLED -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
-fun SetState.label() = when (this) {
-    SetState.ACTIVE -> "Blocking now"
+fun BlockMode.shortLabel() = when (this) {
+    BlockMode.HARD -> "Hard"
+    BlockMode.SOFT -> "Soft"
+    BlockMode.REMINDER -> "Reminder"
+}
+
+fun SetState.label(mode: BlockMode = BlockMode.HARD) = when (this) {
+    SetState.ACTIVE -> if (mode == BlockMode.REMINDER) "Tracking now" else "Blocking now"
     SetState.PAUSED -> "Paused"
     SetState.UPCOMING -> "Waiting"
     SetState.DISABLED -> "Turned off"
@@ -170,10 +176,10 @@ private fun SetCard(set: BlockSet, streak: Int, status: SetStatus, onClick: () -
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ColorDot(accent, 14.dp)
                 Text(set.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                Pill(if (set.mode == BlockMode.HARD) "Hard" else "Soft", accent)
+                Pill(set.mode.shortLabel(), accent)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill(status.state.label(), status.state.color())
+                Pill(status.state.label(set.mode), status.state.color())
                 Text(status.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             status.pending?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary) }
@@ -181,7 +187,7 @@ private fun SetCard(set: BlockSet, streak: Int, status: SetStatus, onClick: () -
                 set.targets.take(MAX_TEASER).forEach { TargetIcon(it, 30.dp) }
                 if (set.targets.size > MAX_TEASER) Hint("+${set.targets.size - MAX_TEASER}")
                 Box(Modifier.weight(1f))
-                if (streak > 0) Text("🔥 $streak-day streak", style = MaterialTheme.typography.labelLarge, color = accent)
+                if (streak > 0 && set.mode != BlockMode.REMINDER) Text("🔥 $streak-day streak", style = MaterialTheme.typography.labelLarge, color = accent)
             }
         }
     }
