@@ -50,9 +50,6 @@ class BlockController(private val service: AccessibilityService, private val sto
     private var engine = BlockEngine(zone, store.state.value.sets, store.state.value.usage)
 
     fun start() {
-        DebugHooks.previewTimeWarning = {
-            banner.show(Target.App("com.instagram.android"), "Instagram · 10 minutes left", "Night Socials (preview)", 0xFF5C6BC0)
-        }
         // Block set edits from the UI take effect immediately.
         scope.launch {
             store.state.map { it.sets }.distinctUntilChanged().collect {
@@ -67,7 +64,6 @@ class BlockController(private val service: AccessibilityService, private val sto
         handler.removeCallbacks(tickRunnable)
         overlay.hide()
         banner.remove()
-        DebugHooks.previewTimeWarning = null
     }
 
     fun onConfigurationChanged() = overlay.relayout()
