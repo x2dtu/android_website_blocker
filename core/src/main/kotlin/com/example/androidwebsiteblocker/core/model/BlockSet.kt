@@ -38,7 +38,19 @@ sealed interface Target {
 /** What the user is looking at right now: the foreground app and, if it's the browser, the site's host. */
 data class Foreground(val packageName: String, val host: String? = null)
 
-enum class BlockMode { HARD, SOFT }
+/**
+ * HARD: no way in. SOFT: get in with a wait and limits. REMINDER: never blocks; just shows
+ * "N minutes so far" banners every [SoftLimits.reminderInterval] of use.
+ */
+enum class BlockMode {
+    HARD, SOFT, REMINDER;
+
+    /** Higher = stricter; moving to a lower rank is a loosening change. */
+    val strictness: Int get() = when (this) { HARD -> 2; SOFT -> 1; REMINDER -> 0 }
+}
+
+/** Default usage reminder interval for new reminder sets. */
+val DEFAULT_REMINDER_INTERVAL: Duration = Duration.ofMinutes(15)
 
 /** Whether soft limits (opens, time) count per app/site or across the whole set together. */
 enum class LimitScope { EACH_TARGET, WHOLE_SET }
@@ -60,12 +72,18 @@ data class SoftLimits(
     val graceTime: Duration = Duration.ofSeconds(15),
     /** Notify at 10 min and 1 min of [totalLimit] left. */
     val timeWarnings: Boolean = true,
+    /**
+     * Show "N minutes so far" every this much use in the window. Optional for SOFT sets; REMINDER
+     * sets always remind (falling back to [DEFAULT_REMINDER_INTERVAL]).
+     */
+    val reminderInterval: Duration? = null,
 ) {
     init {
         require(!unlockDelay.isNegative && !graceTime.isNegative)
         require(maxOpens == null || maxOpens > 0) { "maxOpens must be positive" }
         require(perOpenLimit == null || perOpenLimit > Duration.ZERO) { "perOpenLimit must be positive" }
         require(totalLimit == null || totalLimit > Duration.ZERO) { "totalLimit must be positive" }
+        require(reminderInterval == null || reminderInterval > Duration.ZERO) { "reminderInterval must be positive" }
     }
 }
 

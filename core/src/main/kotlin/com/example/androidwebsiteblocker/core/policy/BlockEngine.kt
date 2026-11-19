@@ -2,6 +2,7 @@ package com.example.androidwebsiteblocker.core.policy
 
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.DEFAULT_REMINDER_INTERVAL
 import com.example.androidwebsiteblocker.core.model.Foreground
 import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.SoftLimits
@@ -28,7 +29,12 @@ data class SoftUsage(
     val opens: List<OpenRecord> = emptyList(),
     /** Time-warning thresholds (minutes left) already sent this window. */
     val warned: Set<Int> = emptySet(),
+    /** How many "N minutes so far" reminders were shown this window. */
+    val remindersSent: Int = 0,
 )
+
+/** "You've used [target] for [used] so far" for one set. */
+data class UsageReminder(val setId: String, val setName: String, val target: Target, val used: Duration)
 
 /** "[target] has [threshold] of total time left" for one soft block set. */
 data class TimeWarning(val setId: String, val setName: String, val target: Target, val threshold: Duration)
@@ -128,6 +134,7 @@ class BlockEngine(
         for (pair in activePairs(fg, now)) {
             val set = pair.set
             val until = pair.occurrence.end
+            if (set.mode == BlockMode.REMINDER) continue // never blocks
             if (set.mode == BlockMode.HARD) {
                 blockers += Blocker(set.id, set.name, pair.target, BlockReason.Scheduled, until)
                 continue
@@ -173,6 +180,7 @@ class BlockEngine(
         }
         (evaluate(foreground, now) as? Decision.InSession)?.remaining?.let { candidates += now.plus(it) }
         upcomingWarnings(now).forEach { candidates += it }
+        upcomingReminders(now).forEach { candidates += it }
         return candidates.minOrNull()
     }
 
@@ -196,6 +204,48 @@ class BlockEngine(
             due += TimeWarning(pair.set.id, pair.set.name, pair.target, Duration.ofMinutes(mostUrgent.toLong()))
         }
         return due
+    }
+
+    /**
+     * "N minutes so far" reminders due now for what's on screen, at most one per set per call.
+     * Each multiple of the interval is reminded once per window.
+     */
+    fun collectReminders(now: Instant): List<UsageReminder> {
+        val fg = foreground ?: return emptyList()
+        val due = mutableListOf<UsageReminder>()
+        for ((pair, interval) in remindablePairs(fg, now)) {
+            val u = _usage[pair.key] ?: SoftUsage()
+            val reached = (u.timeUsed.toMillis() / interval.toMillis()).toInt()
+            if (reached <= u.remindersSent) continue
+            _usage[pair.key] = u.copy(remindersSent = reached)
+            due += UsageReminder(pair.set.id, pair.set.name, pair.target, interval.multipliedBy(reached.toLong()))
+        }
+        return due
+    }
+
+    private fun upcomingReminders(now: Instant): List<Instant> {
+        val fg = foreground ?: return emptyList()
+        return remindablePairs(fg, now).map { (pair, interval) ->
+            val u = _usage[pair.key] ?: SoftUsage()
+            now.plus(interval.multipliedBy((u.remindersSent + 1).toLong()) - u.timeUsed)
+        }.filter { it.isAfter(now) }
+    }
+
+    /** Pairs on screen that are being counted right now and have reminders, with their interval. */
+    private fun remindablePairs(fg: Foreground, now: Instant): List<Pair<ActivePair, Duration>> {
+        val decision = evaluate(fg, now)
+        if (decision is Decision.Blocked || decision is Decision.SoftGate) return emptyList()
+        return activePairs(fg, now).mapNotNull { pair ->
+            val l = pair.set.softLimits
+            when (pair.set.mode) {
+                BlockMode.REMINDER -> pair to (l.reminderInterval ?: DEFAULT_REMINDER_INTERVAL)
+                BlockMode.SOFT -> {
+                    val u = _usage[pair.key]
+                    if (l.reminderInterval != null && u != null && liveSession(u, l, now) != null) pair to l.reminderInterval else null
+                }
+                BlockMode.HARD -> null
+            }
+        }
     }
 
     /** When each pending warning for what's on screen will be due, assuming it stays on screen. */
@@ -252,9 +302,16 @@ class BlockEngine(
         lastAccrualAt = now
         val fg = foreground ?: return
         if (from == null || !now.isAfter(from)) return
-        if (evaluate(fg, from) !is Decision.InSession) return
+        // Only time actually spent in the app counts — not time on a block screen.
+        val decision = evaluate(fg, from)
+        if (decision is Decision.Blocked || decision is Decision.SoftGate) return
         val elapsed = Duration.between(from, now)
         for (pair in activePairs(fg, from)) {
+            if (pair.set.mode == BlockMode.REMINDER) {
+                val u = _usage[pair.key] ?: SoftUsage()
+                _usage[pair.key] = u.copy(timeUsed = u.timeUsed + elapsed)
+                continue
+            }
             if (pair.set.mode != BlockMode.SOFT) continue
             val u = _usage[pair.key] ?: continue
             val session = liveSession(u, pair.set.softLimits, from) ?: continue

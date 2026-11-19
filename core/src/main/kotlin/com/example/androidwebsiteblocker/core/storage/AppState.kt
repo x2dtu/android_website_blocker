@@ -79,6 +79,7 @@ private data class SetDto(
     val graceMs: Long,
     val timeWarnings: Boolean = true,
     val limitScope: String = "EACH_TARGET",
+    val reminderIntervalMs: Long? = null,
     val suspensionMs: Long,
     val maxSuspensions: Int?,
     val suspensionCooldownMs: Long,
@@ -107,6 +108,7 @@ private data class UsageDto(
     val sessionLeftAt: Long? = null,
     val opens: List<OpenDto> = emptyList(),
     val warned: List<Int> = emptyList(),
+    val remindersSent: Int = 0,
 )
 
 @Serializable
@@ -131,7 +133,7 @@ private fun AppState.toDto() = StateDto(
     usage = usage.map { (k, u) ->
         UsageDto(k.setId, k.target.toDto(), k.occurrenceKey, u.opensUsed, u.timeUsed.toMillis(),
             u.session?.used?.toMillis(), u.session?.leftAt?.toEpochMilli(),
-            u.opens.map { OpenDto(it.startedAt.toEpochMilli(), it.used.toMillis()) }, u.warned.sorted())
+            u.opens.map { OpenDto(it.startedAt.toEpochMilli(), it.used.toMillis()) }, u.warned.sorted(), u.remindersSent)
     },
     suspensions = suspensions.map { (id, s) -> SuspensionDto(id, s.occurrenceKey, s.used, s.lastEndsAt?.toEpochMilli()) },
     pendingChanges = pendingChanges.values.map { PendingDto(it.proposed.toDto(), it.requestedAt.toEpochMilli(), it.appliesAt.toEpochMilli()) },
@@ -148,6 +150,7 @@ private fun StateDto.toDomain() = AppState(
             session = u.sessionUsedMs?.let { OpenSession(Duration.ofMillis(it), u.sessionLeftAt?.let(Instant::ofEpochMilli)) },
             opens = u.opens.map { OpenRecord(Instant.ofEpochMilli(it.startedAt), Duration.ofMillis(it.usedMs)) },
             warned = u.warned.toSet(),
+            remindersSent = u.remindersSent,
         )
     },
     suspensions = suspensions.associate { it.setId to SuspensionState(it.occurrence, it.used, it.lastEndsAt?.let(Instant::ofEpochMilli)) },
@@ -169,6 +172,7 @@ private fun BlockSet.toDto() = SetDto(
     totalLimitMs = softLimits.totalLimit?.toMillis(),
     graceMs = softLimits.graceTime.toMillis(),
     timeWarnings = softLimits.timeWarnings,
+    reminderIntervalMs = softLimits.reminderInterval?.toMillis(),
     limitScope = limitScope.name,
     suspensionMs = protection.suspensionDuration.toMillis(),
     maxSuspensions = protection.maxSuspensions,
@@ -189,6 +193,7 @@ private fun SetDto.toDomain() = BlockSet(
         totalLimit = totalLimitMs?.let(Duration::ofMillis),
         graceTime = Duration.ofMillis(graceMs),
         timeWarnings = timeWarnings,
+        reminderInterval = reminderIntervalMs?.let(Duration::ofMillis),
     ),
     limitScope = LimitScope.valueOf(limitScope),
     protection = ProtectionSettings(

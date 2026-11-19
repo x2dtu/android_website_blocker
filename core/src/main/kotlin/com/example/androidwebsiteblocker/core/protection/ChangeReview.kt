@@ -36,7 +36,7 @@ fun isLoosening(old: BlockSet, new: BlockSet): Boolean {
     if (old.enabled && !new.enabled) return true
     if (!new.enabled) return false // editing an already-disabled set can't loosen anything further
     if (!old.enabled) return false // re-enabling is tightening
-    if (old.mode == BlockMode.HARD && new.mode == BlockMode.SOFT) return true
+    if (new.mode.strictness < old.mode.strictness) return true
     if (!new.targets.containsAll(old.targets)) return true
     if (!new.schedule.covers(old.schedule)) return true
 
