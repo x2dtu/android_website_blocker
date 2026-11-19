@@ -545,10 +545,7 @@ private fun AppPickerScreen(selected: Set<String>, onDone: (Set<String>) -> Unit
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         AppIcon(app.packageName, 40.dp)
-                        Column(Modifier.weight(1f)) {
-                            Text(app.label, style = MaterialTheme.typography.bodyLarge)
-                            Hint(app.packageName)
-                        }
+                        Text(app.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Checkbox(checked = app.packageName in chosen, onCheckedChange = null)
                     }
                 }
