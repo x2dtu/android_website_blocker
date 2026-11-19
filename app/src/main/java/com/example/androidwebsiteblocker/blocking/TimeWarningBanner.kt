@@ -48,7 +48,6 @@ class TimeWarningBanner(service: AccessibilityService) {
         val v = ComposeView(context).apply {
             setViewTreeLifecycleOwner(o)
             setViewTreeSavedStateRegistryOwner(o)
-            alpha = 0f
             setContent {
                 // Full-screen, see-through window; the banner sits near the bottom.
                 Box(
@@ -93,7 +92,8 @@ class TimeWarningBanner(service: AccessibilityService) {
         Log.i(TAG, "Time warning banner: $title ($subtitle)")
         view = v
         owner = o
-        v.animate().alpha(1f).setDuration(FADE_IN_MS).start()
+        // No fade-in: on some devices animations never run in overlay windows, which left the
+        // banner fully transparent. It appears at full opacity; removal is timer-based.
         // Diagnostics: confirms the window really laid out and is visible.
         v.postDelayed({
             Log.i(TAG, "Banner window: ${v.width}x${v.height}, shown=${v.isShown}, attached=${v.isAttachedToWindow}, alpha=${v.alpha}")
@@ -117,7 +117,6 @@ class TimeWarningBanner(service: AccessibilityService) {
 
     private companion object {
         const val SHOW_MS = 4_500L
-        const val FADE_IN_MS = 250L
         const val FADE_OUT_MS = 400L
         const val BOTTOM_OFFSET_DP = 96f
     }
