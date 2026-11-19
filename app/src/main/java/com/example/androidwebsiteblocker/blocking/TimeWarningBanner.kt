@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,7 +29,7 @@ import com.example.androidwebsiteblocker.TAG
 import com.example.androidwebsiteblocker.ui.theme.Typography
 
 /**
- * Samsung-style time warning: a small banner over the app in use ("🌙 Instagram · 10 minutes
+ * Samsung-style time warning: a small banner at the top of the screen over the app in use ("🌙 Instagram · 10 minutes
  * left", block set name underneath) that fades out after a few seconds. It ignores touches, so
  * you can keep using the app through it. Uses an accessibility overlay: no extra permission, and
  * not affected by notification settings.
@@ -49,10 +49,10 @@ class TimeWarningBanner(service: AccessibilityService) {
             setViewTreeLifecycleOwner(o)
             setViewTreeSavedStateRegistryOwner(o)
             setContent {
-                // Full-screen, see-through window; the banner sits near the bottom.
+                // Full-screen, see-through window; the banner sits at the top, just under the status bar.
                 Box(
-                    Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = BOTTOM_OFFSET_DP.dp),
-                    contentAlignment = Alignment.BottomCenter,
+                    Modifier.fillMaxSize().statusBarsPadding().padding(top = TOP_OFFSET_DP.dp),
+                    contentAlignment = Alignment.TopCenter,
                 ) {
                     Row(
                         Modifier
@@ -94,10 +94,6 @@ class TimeWarningBanner(service: AccessibilityService) {
         owner = o
         // No fade-in: on some devices animations never run in overlay windows, which left the
         // banner fully transparent. It appears at full opacity; removal is timer-based.
-        // Diagnostics: confirms the window really laid out and is visible.
-        v.postDelayed({
-            Log.i(TAG, "Banner window: ${v.width}x${v.height}, shown=${v.isShown}, attached=${v.isAttachedToWindow}, alpha=${v.alpha}")
-        }, 1_000)
         handler.postDelayed({
             view?.animate()?.alpha(0f)?.setDuration(FADE_OUT_MS)?.withEndAction(::remove)?.start()
         }, SHOW_MS)
@@ -118,6 +114,6 @@ class TimeWarningBanner(service: AccessibilityService) {
     private companion object {
         const val SHOW_MS = 4_500L
         const val FADE_OUT_MS = 400L
-        const val BOTTOM_OFFSET_DP = 96f
+        const val TOP_OFFSET_DP = 12f
     }
 }
