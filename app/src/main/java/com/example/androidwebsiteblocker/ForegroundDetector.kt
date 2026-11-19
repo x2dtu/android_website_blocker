@@ -9,31 +9,36 @@ import com.example.androidwebsiteblocker.blocking.BlockOverlay
 import com.example.androidwebsiteblocker.core.model.Foreground
 import com.example.androidwebsiteblocker.core.model.hostFromAddressBar
 
-const val CHROME_PACKAGE = "com.android.chrome"
-private const val CHROME_URL_BAR_ID = "com.android.chrome:id/url_bar"
-
 /**
  * Works out what the user is actually looking at.
  *
  * Uses the window list rather than event package names: only TYPE_APPLICATION windows count, so
  * the notification shade (System UI), keyboard, and our own block overlay never change the
- * foreground. Screen off or locked → null.
+ * foreground. Screen off or locked → null. For supported [Browsers], also reads the site.
  */
 class ForegroundDetector(private val service: AccessibilityService) {
     private val power = service.getSystemService(PowerManager::class.java)
     private val keyguard = service.getSystemService(KeyguardManager::class.java)
 
     /**
-     * Last site seen in Chrome. Kept while Chrome hides its toolbar (fullscreen video, scrolling)
-     * or while the address bar is being edited, so those don't look like leaving the site.
+     * Last site seen per browser. Kept while a browser hides its toolbar (fullscreen video,
+     * scrolling) or while the address bar is being edited, so those don't look like leaving.
      */
-    private var lastChromeHost: String? = null
+    private val lastHost = mutableMapOf<String, String?>()
 
     /** Screen on and unlocked. */
     fun screenUsable(): Boolean = power.isInteractive && !keyguard.isKeyguardLocked
 
     fun detect(): Foreground? {
         if (!screenUsable()) return null
+        val root = activeAppRoot() ?: return null
+        val pkg = root.packageName?.toString() ?: return null
+        val host = Browsers.forPackage(pkg)?.let { browserHost(root, it) }
+        return Foreground(pkg, host)
+    }
+
+    /** Root node of the app window the user is using (not System UI, keyboard, or our overlays). */
+    fun activeAppRoot(): AccessibilityNodeInfo? {
         val appWindows = service.windows.filter {
             it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.title?.toString() != BlockOverlay.OVERLAY_WINDOW_TITLE
         }
@@ -41,19 +46,45 @@ class ForegroundDetector(private val service: AccessibilityService) {
             ?: appWindows.firstOrNull { it.isActive }
             ?: appWindows.maxByOrNull { it.layer }
             ?: return null
-        val root = window.root ?: return null
-        val pkg = root.packageName?.toString() ?: return null
-        val host = if (pkg == CHROME_PACKAGE) chromeHost(root) else null
-        return Foreground(pkg, host)
+        return window.root
     }
 
-    private fun chromeHost(root: AccessibilityNodeInfo): String? {
-        val urlBar = root.findAccessibilityNodeInfosByViewId(CHROME_URL_BAR_ID).firstOrNull()
+    private fun browserHost(root: AccessibilityNodeInfo, browser: Browser): String? {
+        val urlBar = browser.urlBarIds.firstNotNullOfOrNull { id -> root.findAccessibilityNodeInfosByViewId(id).firstOrNull() }
+            ?: findAddressField(root, browser.packageName)
         if (urlBar != null && !urlBar.isFocused) {
-            val text = urlBar.text?.toString().orEmpty()
-            // Non-URL text (e.g. "Search or type URL" on the new tab page) means no site.
-            lastChromeHost = hostFromAddressBar(text)
+            // Non-URL text (e.g. "Search or type URL" on a new tab page) means no site.
+            lastHost[browser.packageName] = hostFromAddressBar(urlBar.text?.toString().orEmpty())
         }
-        return lastChromeHost
+        return lastHost[browser.packageName]
+    }
+
+    /**
+     * Fallback when no known address bar ID matches: the first text field in the browser's own UI
+     * (never inside the web page) whose text looks like a site address.
+     */
+    private fun findAddressField(root: AccessibilityNodeInfo, pkg: String): AccessibilityNodeInfo? {
+        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(root) }
+        var visited = 0
+        while (queue.isNotEmpty() && visited < MAX_SCAN_NODES) {
+            val node = queue.removeFirst()
+            visited++
+            val cls = node.className?.toString().orEmpty()
+            if (cls.contains("WebView") || cls.contains("GeckoView")) continue // page content
+            val id = node.viewIdResourceName
+            val ownUi = id == null || id.startsWith("$pkg:id/")
+            val text = node.text?.toString()
+            if (ownUi && text != null && (cls.endsWith("EditText") || id?.contains("url") == true || id?.contains("toolbar") == true) &&
+                hostFromAddressBar(text) != null
+            ) {
+                return node
+            }
+            for (i in 0 until node.childCount) node.getChild(i)?.let(queue::add)
+        }
+        return null
+    }
+
+    private companion object {
+        const val MAX_SCAN_NODES = 400
     }
 }
