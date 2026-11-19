@@ -44,6 +44,7 @@ class BlockController(private val service: AccessibilityService, private val sto
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tickRunnable = Runnable { tick() }
     private val overlay = BlockPresenter(service, onLeave = ::leave, onContinue = ::unlock)
+    private val notifier = TimeWarningNotifier(service)
 
     private var zone: ZoneId = ZoneId.systemDefault()
     private var engine = BlockEngine(zone, store.state.value.sets, store.state.value.usage)
@@ -139,6 +140,7 @@ class BlockController(private val service: AccessibilityService, private val sto
 
     private fun handle(decision: Decision) {
         val now = now()
+        engine.foreground?.let { fg -> engine.collectTimeWarnings(now).forEach { notifier.notify(it, label(it.target, fg)) } }
         store.update { if (it.usage == engine.usage) it else it.copy(usage = engine.usage) }
         when (decision) {
             Decision.Allow, is Decision.InSession -> overlay.hide()

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: the launcher crescent, single color. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="1.5" android:scaleY="1.5" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M48.07,34.08 A23,23 0 1,0 72.08,63.43 A19,19 0 0,1 48.07,34.08 Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M72,30 Q72,36 78,36 Q72,36 72,42 Q72,36 66,36 Q72,36 72,30 Z" />
+    </group>
+</vector>

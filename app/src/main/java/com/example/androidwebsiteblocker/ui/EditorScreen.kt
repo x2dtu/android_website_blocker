@@ -74,6 +74,7 @@ private class Draft(set: BlockSet?) {
     var perOpenMin by mutableStateOf(soft.perOpenLimit?.toMinutes()?.toString() ?: "")
     var totalMin by mutableStateOf(soft.totalLimit?.toMinutes()?.toString() ?: "")
     var graceSec by mutableStateOf(soft.graceTime.seconds.toString())
+    var timeWarnings by mutableStateOf(soft.timeWarnings)
 
     private val p = set?.protection ?: ProtectionSettings()
     var suspensionMin by mutableStateOf(p.suspensionDuration.toMinutes().toString())
@@ -105,6 +106,7 @@ private class Draft(set: BlockSet?) {
             perOpenLimit = num(perOpenMin, "Time per open", 1)?.let(Duration::ofMinutes),
             totalLimit = num(totalMin, "Total time", 1)?.let(Duration::ofMinutes),
             graceTime = Duration.ofSeconds(num(graceSec, "Grace period") ?: 15),
+            timeWarnings = timeWarnings,
         )
         val protection = ProtectionSettings(
             suspensionDuration = Duration.ofMinutes(num(suspensionMin, "Emergency pause length", 1) ?: 1),
@@ -279,6 +281,19 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                     info = "If you leave the app briefly — to answer a text, say — and return within this time, " +
                         "it continues the same open instead of using a new one. Time away doesn't count against you.",
                 )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Time warnings", style = MaterialTheme.typography.bodyLarge)
+                        Hint(if (draft.totalMin.isBlank()) "Needs a total time limit" else "Notify at 10 min and 1 min of total time left")
+                    }
+                    InfoButton(
+                        "Time warnings",
+                        "Sends a notification when 10 minutes and 1 minute of an app's total time are left in this window, " +
+                            "so the block doesn't catch you mid-scroll. Each warning comes once per window. " +
+                            "The 10-minute one is skipped if the total limit is 10 minutes or less.",
+                    )
+                    Switch(checked = draft.timeWarnings, onCheckedChange = { draft.timeWarnings = it })
+                }
             }
         }
 

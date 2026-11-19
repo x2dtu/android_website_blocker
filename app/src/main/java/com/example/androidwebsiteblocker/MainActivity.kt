@@ -4,14 +4,19 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,6 +63,7 @@ class MainActivity : ComponentActivity() {
     /** Re-checked on every resume, since the user enables the service in Settings and comes back. */
     private val serviceEnabled = mutableStateOf(false)
     private val batteryExempt = mutableStateOf(true)
+    private val notificationsAllowed = mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +76,7 @@ class MainActivity : ComponentActivity() {
                     // Edge-to-edge: pad for the keyboard so focused fields (e.g. PIN) scroll into view
                     // instead of sitting under it.
                     Column(Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).imePadding()) {
-                        AppRoot(store, serviceEnabled.value, batteryExempt.value)
+                        AppRoot(store, serviceEnabled.value, batteryExempt.value, notificationsAllowed.value) { refreshPermissions() }
                     }
                 }
             }
@@ -79,7 +85,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        refreshPermissions()
+    }
+
+    private fun refreshPermissions() {
         serviceEnabled.value = isServiceEnabled(this)
+        notificationsAllowed.value = Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         batteryExempt.value = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
     }
 }
@@ -94,7 +106,13 @@ fun isServiceEnabled(context: Context): Boolean {
 
 /** Screens: "home", "log", "new", "set:<id>", "edit:<id>". A string so it survives rotation. */
 @Composable
-private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: Boolean) {
+private fun AppRoot(
+    store: StateStore,
+    serviceEnabled: Boolean,
+    batteryExempt: Boolean,
+    notificationsAllowed: Boolean,
+    onPermissionResult: () -> Unit,
+) {
     val context = LocalContext.current
     val state by store.state.collectAsState()
     val connected by ForegroundMonitor.serviceConnected.collectAsState()
@@ -175,7 +193,12 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
             state = state,
             serviceOk = serviceEnabled && connected,
             statusCard = { ServiceStatusCard(serviceEnabled, connected) },
-            setupCard = if (batteryExempt) null else ({ BatteryCard() }),
+            setupCard = if (batteryExempt && notificationsAllowed) null else ({
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (!notificationsAllowed) NotificationsCard(onPermissionResult)
+                    if (!batteryExempt) BatteryCard()
+                }
+            }),
             onOpenSet = { screen = "set:$it" },
             onCreate = { screen = "new" },
             onOpenLog = { screen = "log" },
@@ -187,6 +210,36 @@ private fun changeMessage(outcome: ChangeOutcome?, zone: ZoneId): String = when 
     is ChangeOutcome.ApplyNow -> "Saved — in effect now"
     is ChangeOutcome.Pending -> "This blocks less, so it takes effect at ${formatInstant(outcome.change.appliesAt, zone)}. You can cancel it until then."
     null -> "Nothing changed"
+}
+
+/** Time warnings need notification permission (Android 13+). */
+@Composable
+private fun NotificationsCard(onResult: () -> Unit) {
+    val context = LocalContext.current
+    var asked by rememberSaveable { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        asked = true
+        onResult()
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Time warnings", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Allow notifications to get \"10 minutes left\" and \"1 minute left\" warnings before a soft block's time runs out.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(onClick = {
+                if (!asked && Build.VERSION.SDK_INT >= 33) {
+                    launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    // Already asked once (Android may not show the prompt again): open the settings page.
+                    context.startActivity(
+                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                    )
+                }
+            }) { Text("Allow") }
+        }
+    }
 }
 
 /** Samsung can put apps to sleep; an exemption keeps blocking reliable. */
