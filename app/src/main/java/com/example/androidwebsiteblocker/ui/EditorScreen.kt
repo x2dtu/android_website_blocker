@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -448,14 +450,15 @@ private fun LimitScopeChooser(scope: LimitScope, label: String = "Limits apply t
                 "Switching between apps in the set keeps counting as the same use.",
         )
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // IntrinsicSize.Min + fillMaxHeight: both cards take the taller one's height (like flex stretch).
+    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ChoiceCard(
             "Each app separately", "Separate count per app or site.",
-            scope == LimitScope.EACH_TARGET, { onChange(LimitScope.EACH_TARGET) }, Modifier.weight(1f),
+            scope == LimitScope.EACH_TARGET, { onChange(LimitScope.EACH_TARGET) }, Modifier.weight(1f).fillMaxHeight(),
         )
         ChoiceCard(
             "All together", "One shared count for the whole set.",
-            scope == LimitScope.WHOLE_SET, { onChange(LimitScope.WHOLE_SET) }, Modifier.weight(1f),
+            scope == LimitScope.WHOLE_SET, { onChange(LimitScope.WHOLE_SET) }, Modifier.weight(1f).fillMaxHeight(),
         )
     }
 }
