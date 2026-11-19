@@ -114,8 +114,8 @@ class BlockController(private val service: AccessibilityService, private val sto
     private fun isWebsiteBlock(fg: Foreground): Boolean {
         if (fg.packageName != CHROME_PACKAGE || fg.host == null) return false
         val targets = when (val d = engine.evaluate(fg, now())) {
-            is Decision.Blocked -> d.blockers.map { it.target }
-            is Decision.SoftGate -> d.gates.map { it.target }
+            is Decision.Blocked -> d.blockers.map { concrete(it.setId, it.target, fg) }
+            is Decision.SoftGate -> d.gates.map { concrete(it.setId, it.target, fg) }
             else -> return false
         }
         return targets.any { it is Target.Website || it == Target.AdultWebsites } && engine.evaluate(Foreground(CHROME_PACKAGE), now()) !is Decision.Blocked
@@ -147,7 +147,7 @@ class BlockController(private val service: AccessibilityService, private val sto
                 val minutes = w.threshold.toMinutes()
                 val left = if (minutes == 1L) "1 minute left" else "$minutes minutes left"
                 val color = store.state.value.setById(w.setId)?.colorArgb ?: 0xFF9AAAFF
-                banner.show(w.target, "${label(w.target, fg)} · $left", w.setName, color)
+                banner.show(concrete(w.setId, w.target, fg), "${label(w.target, fg)} · $left", w.setName, color)
             }
         }
         store.update { if (it.usage == engine.usage) it else it.copy(usage = engine.usage) }
@@ -179,7 +179,7 @@ class BlockController(private val service: AccessibilityService, private val sto
                     resetKey = "blocked:${fg}",
                     setName = set.name,
                     colorArgb = set.colorArgb,
-                    target = decision.primary.target,
+                    target = concrete(decision.primary.setId, decision.primary.target, fg),
                     targetLabel = label(decision.primary.target, fg),
                     message = set.message,
                     streakDays = state.streakOf(set.id).days,
@@ -195,7 +195,7 @@ class BlockController(private val service: AccessibilityService, private val sto
                     resetKey = "gate:${fg}:${decision.opens?.used}",
                     setName = set.name,
                     colorArgb = set.colorArgb,
-                    target = gate.target,
+                    target = concrete(gate.setId, gate.target, fg),
                     targetLabel = label(gate.target, fg),
                     message = set.message,
                     streakDays = state.streakOf(set.id).days,
@@ -228,6 +228,15 @@ class BlockController(private val service: AccessibilityService, private val sto
         is Target.Website -> fg.host ?: target.domain
         Target.AdultWebsites -> fg.host ?: "Adult website"
         is Target.App -> appLabel(target.packageName)
+        // Shared limits: name whatever is actually on screen.
+        Target.WholeSet -> fg.host ?: appLabel(fg.packageName)
+    }
+
+    /** The concrete target behind [target] for what's on screen (resolves [Target.WholeSet]). */
+    private fun concrete(setId: String, target: Target, fg: Foreground): Target {
+        if (target != Target.WholeSet) return target
+        val set = store.state.value.setById(setId)
+        return set?.targets?.firstOrNull { it.matches(fg) } ?: Target.App(fg.packageName)
     }
 
     private fun appLabel(packageName: String): String = try {

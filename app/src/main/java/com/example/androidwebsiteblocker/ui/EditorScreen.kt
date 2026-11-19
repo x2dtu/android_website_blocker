@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
@@ -75,6 +76,7 @@ private class Draft(set: BlockSet?) {
     var totalMin by mutableStateOf(soft.totalLimit?.toMinutes()?.toString() ?: "")
     var graceSec by mutableStateOf(soft.graceTime.seconds.toString())
     var timeWarnings by mutableStateOf(soft.timeWarnings)
+    var limitScope by mutableStateOf(set?.limitScope ?: LimitScope.EACH_TARGET)
 
     private val p = set?.protection ?: ProtectionSettings()
     var suspensionMin by mutableStateOf(p.suspensionDuration.toMinutes().toString())
@@ -125,7 +127,7 @@ private class Draft(set: BlockSet?) {
         val base = original ?: BlockSet(id, name, mode, emptySet(), WeeklySchedule(emptyList()))
         return base.copy(
             name = name.trim(), mode = mode, targets = targets.toSet(), schedule = WeeklySchedule(windows),
-            softLimits = softLimits, protection = protection, message = message.trim(), colorArgb = color, pinHash = pinHash,
+            softLimits = softLimits, limitScope = limitScope, protection = protection, message = message.trim(), colorArgb = color, pinHash = pinHash,
         ) to emptyList()
     }
 
@@ -249,8 +251,28 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
         if (draft.mode == BlockMode.SOFT) {
             SectionCard(
                 "Soft block limits",
-                subtitle = "Each app and site gets its own limits. Everything resets when the next window starts.",
+                subtitle = "Everything resets when the next window starts.",
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Limits apply to", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    InfoButton(
+                        "Limits apply to",
+                        "Each app separately: every app and site in this set gets its own opens and time — " +
+                            "10 opens means 10 for Instagram and 10 for TikTok.\n\n" +
+                            "All together: one shared pool for the whole set — 10 opens and 20 minutes across all of them. " +
+                            "Switching between apps in the set during an open keeps the same open.",
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ChoiceCard(
+                        "Each app separately", "Own opens and time per app or site.",
+                        draft.limitScope == LimitScope.EACH_TARGET, { draft.limitScope = LimitScope.EACH_TARGET }, Modifier.weight(1f),
+                    )
+                    ChoiceCard(
+                        "All together", "One shared pool for the whole set.",
+                        draft.limitScope == LimitScope.WHOLE_SET, { draft.limitScope = LimitScope.WHOLE_SET }, Modifier.weight(1f),
+                    )
+                }
                 NumberSetting(
                     "Wait before Continue unlocks", draft.unlockDelaySec, { draft.unlockDelaySec = it }, "sec",
                     hint = "0 = Continue is available right away",
@@ -259,7 +281,8 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                 )
                 NumberSetting(
                     "Opens allowed", draft.maxOpens, { draft.maxOpens = it }, "opens",
-                    hint = "Per app, per window", blankMeans = "Unlimited opens",
+                    hint = if (draft.limitScope == LimitScope.WHOLE_SET) "Shared, per window" else "Per app, per window",
+                    blankMeans = "Unlimited opens",
                     info = "How many times you can tap Continue for each app or site during one window. " +
                         "Shown as circles on the block screen. Once used up, it's blocked until the window ends.",
                 )
@@ -271,7 +294,8 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                 )
                 NumberSetting(
                     "Total time", draft.totalMin, { draft.totalMin = it }, "min",
-                    hint = "Per app, per window, across all opens", blankMeans = "No total limit",
+                    hint = if (draft.limitScope == LimitScope.WHOLE_SET) "Shared, per window, across all opens" else "Per app, per window, across all opens",
+                    blankMeans = "No total limit",
                     info = "Combined time across all opens during one window. When it runs out, the current open is cut short " +
                         "and the app stays blocked until the window ends.",
                 )

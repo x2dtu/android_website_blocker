@@ -2,6 +2,7 @@ package com.example.androidwebsiteblocker.core.protection
 
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.LimitScope
 import java.time.Instant
 
 /** A disable or loosening edit waiting out the set's change wait. One per set; a newer edit replaces it. */
@@ -47,6 +48,7 @@ fun isLoosening(old: BlockSet, new: BlockSet): Boolean {
         if (looser(o.perOpenLimit, n.perOpenLimit)) return true
         if (looser(o.totalLimit, n.totalLimit)) return true
         if (n.graceTime > o.graceTime) return true
+        if (old.limitScope == LimitScope.WHOLE_SET && new.limitScope == LimitScope.EACH_TARGET) return true
     }
 
     val o = old.protection

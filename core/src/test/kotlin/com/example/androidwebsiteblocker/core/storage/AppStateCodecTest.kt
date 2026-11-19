@@ -2,6 +2,7 @@ package com.example.androidwebsiteblocker.core.storage
 
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
@@ -33,6 +34,7 @@ class AppStateCodecTest {
         schedule = WeeklySchedule(listOf(DayWindow(DayOfWeek.SUNDAY, 0, 480), DayWindow(DayOfWeek.SATURDAY, 1380, MINUTES_PER_DAY))),
         softLimits = SoftLimits(Duration.ofSeconds(10), 4, Duration.ofMinutes(3), Duration.ofMinutes(12), Duration.ofSeconds(20), timeWarnings = false),
         protection = ProtectionSettings(Duration.ofMinutes(2), null, Duration.ofSeconds(45), Duration.ofMinutes(7)),
+        limitScope = LimitScope.WHOLE_SET,
         message = "Sleep is a superpower",
         colorArgb = 0xFF00897B,
         pinHash = PinHasher.hash("1234"),
@@ -48,6 +50,7 @@ class AppStateCodecTest {
                     listOf(OpenRecord(now.minusSeconds(600), Duration.ofMinutes(4)), OpenRecord(now.minusSeconds(60), Duration.ofSeconds(30))),
                     warned = setOf(10)),
             UsageKey("s1", Target.App("com.instagram.android"), "2026-11-14T23:00") to SoftUsage(1, Duration.ofMinutes(1)),
+            UsageKey("s1", Target.WholeSet, "2026-11-14T23:00") to SoftUsage(3, Duration.ofMinutes(9)),
         ),
         suspensions = mapOf("s1" to SuspensionState("2026-11-14T23:00", 1, now)),
         pendingChanges = mapOf("s1" to PendingChange("s1", soft.copy(enabled = false), now, now.plusSeconds(300))),

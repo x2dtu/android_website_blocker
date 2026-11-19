@@ -3,6 +3,7 @@ package com.example.androidwebsiteblocker.core.policy
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.Foreground
+import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.schedule.WindowOccurrence
@@ -81,9 +82,10 @@ class BlockEngine(
         foreground = newForeground
         for ((key, u) in _usage.entries.toList()) {
             val session = u.session ?: continue
-            val wasOn = old != null && key.target.matches(old)
-            val isOn = newForeground != null && key.target.matches(newForeground)
-            val limits = setById(key.setId)?.softLimits ?: continue
+            val set = setById(key.setId) ?: continue
+            val wasOn = old != null && keyMatches(set, key, old)
+            val isOn = newForeground != null && keyMatches(set, key, newForeground)
+            val limits = set.softLimits
             when {
                 wasOn && !isOn -> _usage[key] = u.copy(session = session.copy(leftAt = now))
                 isOn && session.leftAt != null -> _usage[key] = u.copy(
@@ -225,8 +227,13 @@ class BlockEngine(
         for (set in sets) {
             if (!set.enabled || set.isSuspended(now)) continue
             val occurrence = set.schedule.occurrenceAt(now, zone) ?: continue
-            for (target in set.targets) {
-                if (target.matches(fg)) add(ActivePair(set, target, occurrence))
+            if (set.limitScope == LimitScope.WHOLE_SET) {
+                // One shared count for the whole set, whichever of its apps/sites is on screen.
+                if (set.matches(fg)) add(ActivePair(set, Target.WholeSet, occurrence))
+            } else {
+                for (target in set.targets) {
+                    if (target.matches(fg)) add(ActivePair(set, target, occurrence))
+                }
             }
         }
     }
@@ -266,4 +273,8 @@ class BlockEngine(
     }
 
     private fun setById(id: String) = sets.firstOrNull { it.id == id }
+
+    /** Whether a usage key covers [fg] — for shared limits, any of the set's targets. */
+    private fun keyMatches(set: BlockSet, key: UsageKey, fg: Foreground): Boolean =
+        if (key.target == Target.WholeSet) set.matches(fg) else key.target.matches(fg)
 }

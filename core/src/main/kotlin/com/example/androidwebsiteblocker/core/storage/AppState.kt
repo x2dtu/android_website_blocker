@@ -2,6 +2,7 @@ package com.example.androidwebsiteblocker.core.storage
 
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
@@ -77,6 +78,7 @@ private data class SetDto(
     val totalLimitMs: Long?,
     val graceMs: Long,
     val timeWarnings: Boolean = true,
+    val limitScope: String = "EACH_TARGET",
     val suspensionMs: Long,
     val maxSuspensions: Int?,
     val suspensionCooldownMs: Long,
@@ -167,6 +169,7 @@ private fun BlockSet.toDto() = SetDto(
     totalLimitMs = softLimits.totalLimit?.toMillis(),
     graceMs = softLimits.graceTime.toMillis(),
     timeWarnings = softLimits.timeWarnings,
+    limitScope = limitScope.name,
     suspensionMs = protection.suspensionDuration.toMillis(),
     maxSuspensions = protection.maxSuspensions,
     suspensionCooldownMs = protection.suspensionCooldown.toMillis(),
@@ -187,6 +190,7 @@ private fun SetDto.toDomain() = BlockSet(
         graceTime = Duration.ofMillis(graceMs),
         timeWarnings = timeWarnings,
     ),
+    limitScope = LimitScope.valueOf(limitScope),
     protection = ProtectionSettings(
         suspensionDuration = Duration.ofMillis(suspensionMs),
         maxSuspensions = maxSuspensions,
@@ -201,11 +205,13 @@ private fun Target.toDto() = when (this) {
     is Target.App -> TargetDto("app", packageName)
     is Target.Website -> TargetDto("web", domain)
     Target.AdultWebsites -> TargetDto("adult", "")
+    Target.WholeSet -> TargetDto("set", "")
 }
 
 private fun TargetDto.toDomain(): Target = when (type) {
     "app" -> Target.App(value)
     "web" -> Target.Website(value)
     "adult" -> Target.AdultWebsites
+    "set" -> Target.WholeSet
     else -> error("Unknown target type: $type")
 }

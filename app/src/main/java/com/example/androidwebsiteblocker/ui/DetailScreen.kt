@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
+import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.policy.SoftUsage
 import com.example.androidwebsiteblocker.core.policy.UsageKey
@@ -129,7 +130,10 @@ fun DetailScreen(
 
         if (set.mode == BlockMode.SOFT) {
             UsageSection(set, state, now, zone)
-            SectionCard("Soft block limits", subtitle = "Per app or site, reset each window") {
+            SectionCard(
+                "Soft block limits",
+                subtitle = if (set.limitScope == LimitScope.WHOLE_SET) "Shared across the whole set, reset each window" else "Per app or site, reset each window",
+            ) {
                 val l = set.softLimits
                 LimitRow("Wait before Continue unlocks", if (l.unlockDelay.isZero) "None" else formatDuration(l.unlockDelay))
                 LimitRow("Opens allowed", l.maxOpens?.toString() ?: "Unlimited")
@@ -219,7 +223,8 @@ private fun UsageSection(set: BlockSet, state: AppState, now: Instant, zone: Zon
             return@SectionCard
         }
         val l = set.softLimits
-        set.targets.sortedBy { it !is Target.App }.forEach { target ->
+        val usageTargets = if (set.limitScope == LimitScope.WHOLE_SET) listOf(Target.WholeSet) else set.targets.sortedBy { it !is Target.App }
+        usageTargets.forEach { target ->
             val u = state.usage[UsageKey(set.id, target, occurrence.key)] ?: SoftUsage()
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TargetIcon(target, 32.dp)

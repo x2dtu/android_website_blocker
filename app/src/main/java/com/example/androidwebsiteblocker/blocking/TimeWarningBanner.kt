@@ -78,6 +78,7 @@ class TimeWarningBanner(service: AccessibilityService) {
             is Target.App -> target.packageName.substringAfterLast('.').take(1).uppercase()
             is Target.Website -> target.domain.take(1).uppercase()
             Target.AdultWebsites -> "18+"
+            Target.WholeSet -> "•" // callers pass the concrete app/site instead
         }
         val content = ComposeView(context).apply {
             setContent {

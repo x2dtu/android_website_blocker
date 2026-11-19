@@ -74,6 +74,7 @@ fun targetLabel(context: Context, target: Target): String = when (target) {
     is Target.App -> appLabel(context, target.packageName)
     is Target.Website -> target.domain
     Target.AdultWebsites -> "Adult websites"
+    Target.WholeSet -> "All apps & sites together"
 }
 
 private val iconCache = LruCache<String, ImageBitmap>(200)
@@ -84,6 +85,7 @@ fun TargetIcon(target: Target, size: Dp = 32.dp) {
         is Target.App -> AppIcon(target.packageName, size)
         is Target.Website -> LetterIcon(target.domain, size)
         Target.AdultWebsites -> BadgeIcon("18+", size)
+        Target.WholeSet -> BadgeIcon("All", size)
     }
 }
 

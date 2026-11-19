@@ -21,10 +21,17 @@ sealed interface Target {
      */
     data object AdultWebsites : Target
 
+    /**
+     * Stands for "all targets of the set together" in usage tracking when the set's limits are
+     * shared ([LimitScope.WHOLE_SET]). Never stored in a set's targets.
+     */
+    data object WholeSet : Target
+
     fun matches(foreground: Foreground): Boolean = when (this) {
         is App -> foreground.packageName == packageName
         is Website -> foreground.host?.let { it == domain || it.endsWith(".$domain") } == true
         AdultWebsites -> foreground.host?.let(AdultSites::contains) == true
+        WholeSet -> false // resolved against the set's targets by the engine
     }
 }
 
@@ -32,6 +39,9 @@ sealed interface Target {
 data class Foreground(val packageName: String, val host: String? = null)
 
 enum class BlockMode { HARD, SOFT }
+
+/** Whether soft limits (opens, time) count per app/site or across the whole set together. */
+enum class LimitScope { EACH_TARGET, WHOLE_SET }
 
 /**
  * Soft block restrictions. Every limit is optional; any combination is allowed.
@@ -84,6 +94,7 @@ data class BlockSet(
     val targets: Set<Target>,
     val schedule: WeeklySchedule,
     val softLimits: SoftLimits = SoftLimits(),
+    val limitScope: LimitScope = LimitScope.EACH_TARGET,
     val protection: ProtectionSettings = ProtectionSettings(),
     /** Motivational message shown on the block screen. */
     val message: String = "",
@@ -95,4 +106,7 @@ data class BlockSet(
     val suspendedUntil: Instant? = null,
 ) {
     fun isSuspended(now: Instant): Boolean = suspendedUntil?.isAfter(now) == true
+
+    /** Whether [foreground] is one of this set's targets. */
+    fun matches(foreground: Foreground): Boolean = targets.any { it.matches(foreground) }
 }
