@@ -20,7 +20,6 @@ object StateActions {
 
     fun addSet(state: AppState, set: BlockSet): AppState {
         require(state.sets.none { it.id == set.id }) { "Duplicate set id ${set.id}" }
-        requireNotNull(set.pinHash) { "A block set needs a PIN" }
         return state.copy(sets = state.sets + set)
     }
 

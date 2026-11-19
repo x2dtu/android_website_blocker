@@ -88,6 +88,7 @@ private class Draft(set: BlockSet?) {
     var cooldownSec by mutableStateOf(p.suspensionCooldown.seconds.toString())
     var changeWaitMin by mutableStateOf(p.changeWait.toMinutes().toString())
 
+    var usePin by mutableStateOf(true)
     var pin by mutableStateOf("")
     var pinConfirm by mutableStateOf("")
 
@@ -142,6 +143,7 @@ private class Draft(set: BlockSet?) {
         )
         val pinHash = if (original == null) {
             when {
+                !usePin -> null
                 !PinHasher.isValidPin(pin) -> { errors += "PIN must be ${PinHasher.MIN_LENGTH}–${PinHasher.MAX_LENGTH} digits"; null }
                 pin != pinConfirm -> { errors += "PINs don't match"; null }
                 else -> PinHasher.hash(pin)
@@ -393,12 +395,19 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
         if (original == null) {
             SectionCard(
                 "PIN",
-                subtitle = "Needed to edit, pause, or disable this block set",
-                info = "4–12 digits. There's no recovery — if you forget it, the only way out is clearing the app's data, " +
-                    "which deletes all block sets.",
+                subtitle = if (draft.usePin) "Needed to edit, pause, or turn off this block set" else "Without a PIN, those just ask \"Are you sure?\"",
+                info = "A PIN adds a moment of friction before you can weaken a block set. Cooling-off waits apply either way.\n\n" +
+                    "4–12 digits. There's no recovery — if you forget it, the only way out is clearing the app's data, " +
+                    "which deletes all block sets. You choose this when creating the set.",
             ) {
-                PinField(draft.pin, { draft.pin = it }, "PIN")
-                PinField(draft.pinConfirm, { draft.pinConfirm = it }, "Confirm PIN")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Protect with a PIN", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Switch(checked = draft.usePin, onCheckedChange = { draft.usePin = it })
+                }
+                if (draft.usePin) {
+                    PinField(draft.pin, { draft.pin = it }, "PIN")
+                    PinField(draft.pinConfirm, { draft.pinConfirm = it }, "Confirm PIN")
+                }
             }
         } else {
             Hint(

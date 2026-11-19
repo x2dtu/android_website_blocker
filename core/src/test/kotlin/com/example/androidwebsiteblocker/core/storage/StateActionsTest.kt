@@ -90,8 +90,14 @@ class StateActionsTest {
         assertEquals(AppState(), StateActions.deleteSet(disabled, "s"))
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun `new set requires a pin`() {
-        StateActions.addSet(AppState(), set.copy(id = "x", pinHash = null))
+    @Test fun `a PIN is optional`() {
+        val s = StateActions.addSet(AppState(), set.copy(id = "x", pinHash = null))
+        assertNull(s.setById("x")!!.pinHash)
+    }
+
+    @Test fun `removing a PIN waits like other loosening edits`() {
+        val (s, outcome) = StateActions.requestEdit(base, set.copy(pinHash = null), mon, zone)
+        assertTrue(outcome is ChangeOutcome.Pending)
+        assertEquals(pin, s.setById("s")!!.pinHash)
     }
 }

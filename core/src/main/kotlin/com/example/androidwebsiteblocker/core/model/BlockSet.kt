@@ -117,7 +117,7 @@ data class BlockSet(
     /** Motivational message shown on the block screen. */
     val message: String = "",
     val colorArgb: Long = 0xFF5C6BC0,
-    /** See [com.example.androidwebsiteblocker.core.protection.PinHasher]. Null only before setup completes. */
+    /** See [com.example.androidwebsiteblocker.core.protection.PinHasher]. Null = no PIN (actions just ask to confirm). */
     val pinHash: String? = null,
     val enabled: Boolean = true,
     /** While now is before this, the whole set is ignored (temporary emergency suspension). */

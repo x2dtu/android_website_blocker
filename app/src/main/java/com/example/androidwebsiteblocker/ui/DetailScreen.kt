@@ -169,7 +169,11 @@ fun DetailScreen(
         }
 
         SectionCard("Manage") {
-            OutlinedButton(onClick = { pinFor = SetAction.EDIT }, modifier = Modifier.fillMaxWidth()) { Text("Edit block set") }
+            OutlinedButton(
+                // No PIN: go straight to editing (cooling-off still applies when saving).
+                onClick = { if (set.pinHash == null) onAction(SetAction.EDIT) else pinFor = SetAction.EDIT },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Edit block set") }
             if (set.enabled) {
                 OutlinedButton(onClick = { pinFor = SetAction.DISABLE }, modifier = Modifier.fillMaxWidth()) { Text("Turn off") }
                 Hint("Turning off takes effect after ${formatDuration(set.protection.changeWait)}. You can cancel it until then.")
@@ -186,14 +190,43 @@ fun DetailScreen(
     }
 
     pinFor?.let { action ->
-        PinDialog(action.pinTitle, set.pinHash.orEmpty(), onVerified = { pinFor = null; onAction(action) }, onDismiss = { pinFor = null })
+        val pinHash = set.pinHash
+        when {
+            pinHash != null ->
+                PinDialog(action.pinTitle, pinHash, onVerified = { pinFor = null; onAction(action) }, onDismiss = { pinFor = null })
+            // No PIN: ask to confirm instead.
+            else -> ConfirmDialog(
+                action.confirmTitle(set.name), action.confirmText(set), "Yes",
+                onConfirm = { pinFor = null; onAction(action) }, onDismiss = { pinFor = null },
+            )
+        }
     }
     if (confirmDelete) {
         ConfirmDialog(
             "Delete ${set.name}?", "This removes the block set and its streak for good.", "Continue",
-            onConfirm = { confirmDelete = false; pinFor = SetAction.DELETE }, onDismiss = { confirmDelete = false },
+            onConfirm = {
+                confirmDelete = false
+                if (set.pinHash == null) onAction(SetAction.DELETE) else pinFor = SetAction.DELETE
+            },
+            onDismiss = { confirmDelete = false },
         )
     }
+}
+
+private fun SetAction.confirmTitle(name: String) = when (this) {
+    SetAction.SUSPEND -> "Pause $name?"
+    SetAction.DISABLE -> "Turn off $name?"
+    SetAction.ENABLE -> "Turn on $name?"
+    SetAction.DELETE -> "Delete $name?"
+    SetAction.EDIT -> "Edit $name?"
+}
+
+private fun SetAction.confirmText(set: BlockSet) = when (this) {
+    SetAction.SUSPEND -> "It stops blocking for ${formatDuration(set.protection.suspensionDuration)} and resets your streak."
+    SetAction.DISABLE -> "It turns off after ${formatDuration(set.protection.changeWait)}. You can cancel until then."
+    SetAction.ENABLE -> "It starts applying right away."
+    SetAction.DELETE -> "This can't be undone."
+    SetAction.EDIT -> ""
 }
 
 @Composable
