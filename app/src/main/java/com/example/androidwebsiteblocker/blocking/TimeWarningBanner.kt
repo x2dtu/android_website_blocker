@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -31,6 +32,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.example.androidwebsiteblocker.TAG
 import com.example.androidwebsiteblocker.ui.theme.Typography
 
 /**
@@ -89,7 +91,14 @@ class TimeWarningBanner(service: AccessibilityService) {
             y = (context.resources.displayMetrics.density * BOTTOM_OFFSET_DP).toInt() // clear of the nav bar
             setTitle("NightBlocker time warning")
         }
-        windowManager.addView(v, params)
+        try {
+            windowManager.addView(v, params)
+        } catch (e: RuntimeException) {
+            Log.e(TAG, "Couldn't show time warning banner: $title", e)
+            o.destroy()
+            return
+        }
+        Log.i(TAG, "Time warning banner: $title ($subtitle)")
         view = v
         owner = o
         visibility = state
