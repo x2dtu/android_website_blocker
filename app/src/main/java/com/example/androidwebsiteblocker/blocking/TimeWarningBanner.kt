@@ -60,8 +60,6 @@ class TimeWarningBanner(service: AccessibilityService) {
         val o = OverlayOwner().also { it.start() }
         val accent = Color(colorArgb.toInt())
         val content = ComposeView(context).apply {
-            setViewTreeLifecycleOwner(o)
-            setViewTreeSavedStateRegistryOwner(o)
             setContent {
                 Row(
                     Modifier
@@ -80,6 +78,9 @@ class TimeWarningBanner(service: AccessibilityService) {
             }
         }
         val frame = FrameLayout(context).apply {
+            // Compose looks these up from the window's root view, so they go on the container.
+            setViewTreeLifecycleOwner(o)
+            setViewTreeSavedStateRegistryOwner(o)
             clipChildren = false
             addView(content)
             setOnTouchListener(SwipeToDismiss(content))
