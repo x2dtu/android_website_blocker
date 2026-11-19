@@ -6,6 +6,7 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -41,8 +43,9 @@ import kotlin.math.abs
  * banner, so the rest of the screen stays usable. Uses an accessibility overlay: no extra
  * permission, and not affected by notification settings.
  *
- * No animations: on some devices they never run in overlay windows (that left earlier versions
- * invisible). Dragging moves the banner directly with the finger instead.
+ * The system animation frameworks don't run in overlay windows on some devices (that left
+ * earlier versions invisible), so fading is done with Handler steps and dragging moves the
+ * banner directly with the finger.
  */
 class TimeWarningBanner(service: AccessibilityService) {
     private val context = service
@@ -63,21 +66,23 @@ class TimeWarningBanner(service: AccessibilityService) {
             setContent {
                 Row(
                     Modifier
+                        .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 4.dp)
-                        .background(Color(0xF0151929), RoundedCornerShape(20.dp))
-                        .padding(start = 12.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+                        .background(Color(0xF2151929), RoundedCornerShape(24.dp))
+                        .padding(start = 16.dp, end = 20.dp, top = 18.dp, bottom = 18.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Box(Modifier.width(4.dp).height(36.dp).background(accent, RoundedCornerShape(2.dp)))
-                    Column {
-                        Text(title, color = Color.White, style = Typography.titleSmall)
-                        Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.labelMedium)
+                    Box(Modifier.width(5.dp).height(48.dp).background(accent, RoundedCornerShape(3.dp)))
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(title, color = Color.White, style = Typography.titleLarge)
+                        Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.bodyMedium)
                     }
                 }
             }
         }
         val frame = FrameLayout(context).apply {
+            alpha = 0f
             // Compose looks these up from the window's root view, so they go on the container.
             setViewTreeLifecycleOwner(o)
             setViewTreeSavedStateRegistryOwner(o)
@@ -88,13 +93,13 @@ class TimeWarningBanner(service: AccessibilityService) {
         // Banner-sized window at the top, just under the status bar. Not focusable, so it never
         // takes the keyboard, and touches outside it go to the app as usual.
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.TOP
             y = statusBarHeight() + (TOP_OFFSET_DP * density).toInt()
             setTitle("NightBlocker time warning")
         }
@@ -109,7 +114,32 @@ class TimeWarningBanner(service: AccessibilityService) {
         container = frame
         owner = o
         dismissOnRelease = false
-        handler.postDelayed({ if (dragging) dismissOnRelease = true else remove() }, SHOW_MS)
+        fade(frame, to = 1f, durationMs = FADE_IN_MS)
+        handler.postDelayed({ if (dragging) dismissOnRelease = true else fadeOutAndRemove() }, SHOW_MS)
+    }
+
+    private fun fadeOutAndRemove() {
+        val frame = container ?: return
+        fade(frame, to = 0f, durationMs = FADE_OUT_MS) { remove() }
+    }
+
+    /**
+     * Fades with plain Handler steps (~60 fps). The system animation frameworks don't run in
+     * overlay windows on some devices, but Handler callbacks and redraws do.
+     */
+    private fun fade(view: android.view.View, to: Float, durationMs: Long, then: (() -> Unit)? = null) {
+        handler.removeCallbacksAndMessages(FADE_TOKEN)
+        val from = view.alpha
+        val start = SystemClock.uptimeMillis()
+        val step = object : Runnable {
+            override fun run() {
+                if (container !== view) return
+                val t = ((SystemClock.uptimeMillis() - start).toFloat() / durationMs).coerceIn(0f, 1f)
+                view.alpha = from + (to - from) * t
+                if (t < 1f) handler.postAtTime(this, FADE_TOKEN, SystemClock.uptimeMillis() + FRAME_MS) else then?.invoke()
+            }
+        }
+        handler.postAtTime(step, FADE_TOKEN, SystemClock.uptimeMillis())
     }
 
     fun remove() {
@@ -151,8 +181,10 @@ class TimeWarningBanner(service: AccessibilityService) {
                     val dy = e.rawY - downY
                     val swipedAway = abs(dx) > target.width * DISMISS_FRACTION || dy < -DISMISS_UP_DP * density
                     val tapped = e.actionMasked == MotionEvent.ACTION_UP && !moved
-                    if (swipedAway || tapped || dismissOnRelease) {
+                    if (swipedAway) {
                         remove()
+                    } else if (tapped || dismissOnRelease) {
+                        fadeOutAndRemove()
                     } else {
                         target.translationX = 0f
                         target.translationY = 0f
@@ -175,6 +207,10 @@ class TimeWarningBanner(service: AccessibilityService) {
 
     private companion object {
         const val SHOW_MS = 4_500L
+        const val FADE_IN_MS = 200L
+        const val FADE_OUT_MS = 300L
+        const val FRAME_MS = 16L
+        val FADE_TOKEN = Any()
         const val TOP_OFFSET_DP = 8f
         const val DISMISS_FRACTION = 0.3f
         const val DISMISS_UP_DP = 24f
