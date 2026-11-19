@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
@@ -101,7 +102,7 @@ class TimeWarningBanner(service: AccessibilityService) {
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(title, color = Color.White, style = Typography.titleLarge)
+                        Text(title, color = Color.White, style = Typography.titleMedium.copy(fontSize = 18.sp))
                         Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.bodyMedium)
                     }
                 }
