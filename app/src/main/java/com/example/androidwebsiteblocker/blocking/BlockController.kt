@@ -51,7 +51,7 @@ class BlockController(private val service: AccessibilityService, private val sto
 
     fun start() {
         DebugHooks.previewTimeWarning = {
-            banner.show("🌙 Instagram · 10 minutes left", "Night Socials (preview)", 0xFF5C6BC0)
+            banner.show(Target.App("com.instagram.android"), "Instagram · 10 minutes left", "Night Socials (preview)", 0xFF5C6BC0)
         }
         // Block set edits from the UI take effect immediately.
         scope.launch {
@@ -151,7 +151,7 @@ class BlockController(private val service: AccessibilityService, private val sto
                 val minutes = w.threshold.toMinutes()
                 val left = if (minutes == 1L) "1 minute left" else "$minutes minutes left"
                 val color = store.state.value.setById(w.setId)?.colorArgb ?: 0xFF9AAAFF
-                banner.show("🌙 ${label(w.target, fg)} · $left", w.setName, color)
+                banner.show(w.target, "${label(w.target, fg)} · $left", w.setName, color)
             }
         }
         store.update { if (it.usage == engine.usage) it else it.copy(usage = engine.usage) }

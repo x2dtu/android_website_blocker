@@ -2,6 +2,7 @@ package com.example.androidwebsiteblocker.blocking
 
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -14,6 +15,7 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,23 +24,29 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.example.androidwebsiteblocker.TAG
+import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.ui.theme.Typography
 import kotlin.math.abs
 
 /**
  * Samsung-style time warning: a small banner at the top of the screen over the app in use
- * ("🌙 Instagram · 10 minutes left", block set name underneath). Swipe it sideways or up, or tap
+ * (the app's icon, "Instagram · 10 minutes left", block set name underneath). Swipe it sideways or up, or tap
  * it, to dismiss; otherwise it goes away after a few seconds. Its window is only as big as the
  * banner, so the rest of the screen stays usable. Uses an accessibility overlay: no extra
  * permission, and not affected by notification settings.
@@ -58,10 +66,18 @@ class TimeWarningBanner(service: AccessibilityService) {
     private var dismissOnRelease = false
     private var dragging = false
 
-    fun show(title: String, subtitle: String, colorArgb: Long) {
+    /** [target] supplies the icon: the app's own icon, or a letter / "18+" badge for websites. */
+    fun show(target: Target, title: String, subtitle: String, colorArgb: Long) {
         remove()
         val o = OverlayOwner().also { it.start() }
         val accent = Color(colorArgb.toInt())
+        // Loaded up front (not asynchronously inside Compose) so the first frame is complete.
+        val appIcon = (target as? Target.App)?.let { loadAppIcon(it.packageName) }
+        val badge = when (target) {
+            is Target.App -> target.packageName.substringAfterLast('.').take(1).uppercase()
+            is Target.Website -> target.domain.take(1).uppercase()
+            Target.AdultWebsites -> "18+"
+        }
         val content = ComposeView(context).apply {
             setContent {
                 Row(
@@ -74,6 +90,16 @@ class TimeWarningBanner(service: AccessibilityService) {
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Box(Modifier.width(5.dp).height(48.dp).background(accent, RoundedCornerShape(3.dp)))
+                    if (appIcon != null) {
+                        Image(appIcon, contentDescription = null, modifier = Modifier.size(44.dp))
+                    } else {
+                        Box(
+                            Modifier.size(44.dp).background(accent.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(badge, color = Color.White, style = if (badge.length > 1) Typography.labelLarge else Typography.titleLarge)
+                        }
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(title, color = Color.White, style = Typography.titleLarge)
                         Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.bodyMedium)
@@ -196,6 +222,12 @@ class TimeWarningBanner(service: AccessibilityService) {
         }
     }
 
+    private fun loadAppIcon(packageName: String): ImageBitmap? = try {
+        context.packageManager.getApplicationIcon(packageName).toBitmap(ICON_PX, ICON_PX).asImageBitmap()
+    } catch (_: PackageManager.NameNotFoundException) {
+        null
+    }
+
     private fun statusBarHeight(): Int {
         if (Build.VERSION.SDK_INT >= 30) {
             return windowManager.currentWindowMetrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
@@ -207,6 +239,7 @@ class TimeWarningBanner(service: AccessibilityService) {
 
     private companion object {
         const val SHOW_MS = 4_500L
+        const val ICON_PX = 144
         const val FADE_IN_MS = 200L
         const val FADE_OUT_MS = 300L
         const val FRAME_MS = 16L
