@@ -1,6 +1,7 @@
 package com.example.androidwebsiteblocker
 
 import android.accessibilityservice.AccessibilityService
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -51,6 +52,8 @@ class NightBlockerService : AccessibilityService() {
         }
         ContextCompat.registerReceiver(this, timeReceiver, timeFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
         AdultSiteList.ensureLoaded(this)
+        // Time warnings used to be notifications; remove that now-unused channel from settings.
+        getSystemService(NotificationManager::class.java).deleteNotificationChannel("time_warnings")
         controller = BlockController(this, StateStore.get(this)).also { it.start() }
         // If the block screen gets covered (user switched apps), re-check what's really on screen.
         BlockScreenHost.onHiddenWhileBlocking = { refresh() }

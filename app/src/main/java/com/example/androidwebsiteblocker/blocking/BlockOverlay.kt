@@ -149,7 +149,7 @@ private class OverlayView(
 }
 
 /** Minimal lifecycle + saved state so Compose can run outside an Activity. */
-private class OverlayOwner : LifecycleOwner, SavedStateRegistryOwner {
+internal class OverlayOwner : LifecycleOwner, SavedStateRegistryOwner {
     private val registry = LifecycleRegistry(this)
     private val savedState = SavedStateRegistryController.create(this)
 

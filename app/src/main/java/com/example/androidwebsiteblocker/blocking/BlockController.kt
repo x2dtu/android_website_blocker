@@ -44,7 +44,7 @@ class BlockController(private val service: AccessibilityService, private val sto
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tickRunnable = Runnable { tick() }
     private val overlay = BlockPresenter(service, onLeave = ::leave, onContinue = ::unlock)
-    private val notifier = TimeWarningNotifier(service)
+    private val banner = TimeWarningBanner(service)
 
     private var zone: ZoneId = ZoneId.systemDefault()
     private var engine = BlockEngine(zone, store.state.value.sets, store.state.value.usage)
@@ -63,6 +63,7 @@ class BlockController(private val service: AccessibilityService, private val sto
         scope.cancel()
         handler.removeCallbacks(tickRunnable)
         overlay.hide()
+        banner.remove()
     }
 
     fun onConfigurationChanged() = overlay.relayout()
@@ -140,7 +141,15 @@ class BlockController(private val service: AccessibilityService, private val sto
 
     private fun handle(decision: Decision) {
         val now = now()
-        engine.foreground?.let { fg -> engine.collectTimeWarnings(now).forEach { notifier.notify(it, label(it.target, fg)) } }
+        engine.foreground?.let { fg ->
+            // Several sets warning at once: show the most urgent.
+            engine.collectTimeWarnings(now).minByOrNull { it.threshold }?.let { w ->
+                val minutes = w.threshold.toMinutes()
+                val left = if (minutes == 1L) "1 minute left" else "$minutes minutes left"
+                val color = store.state.value.setById(w.setId)?.colorArgb ?: 0xFF9AAAFF
+                banner.show("🌙 ${label(w.target, fg)} · $left", w.setName, color)
+            }
+        }
         store.update { if (it.usage == engine.usage) it else it.copy(usage = engine.usage) }
         when (decision) {
             Decision.Allow, is Decision.InSession -> overlay.hide()

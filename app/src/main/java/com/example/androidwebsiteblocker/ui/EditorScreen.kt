@@ -284,13 +284,13 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text("Time warnings", style = MaterialTheme.typography.bodyLarge)
-                        Hint(if (draft.totalMin.isBlank()) "Needs a total time limit" else "Notify at 10 min and 1 min of total time left")
+                        Hint(if (draft.totalMin.isBlank()) "Needs a total time limit" else "Banner at 10 min and 1 min of total time left")
                     }
                     InfoButton(
                         "Time warnings",
-                        "Sends a notification when 10 minutes and 1 minute of an app's total time are left in this window, " +
-                            "so the block doesn't catch you mid-scroll. Each warning comes once per window. " +
-                            "The 10-minute one is skipped if the total limit is 10 minutes or less.",
+                        "Shows a small banner over the app when 10 minutes and 1 minute of its total time are left in this window, " +
+                            "so the block doesn't catch you mid-scroll. It fades after a few seconds and you can keep using the app. " +
+                            "Each warning comes once per window; the 10-minute one is skipped if the total limit is 10 minutes or less.",
                     )
                     Switch(checked = draft.timeWarnings, onCheckedChange = { draft.timeWarnings = it })
                 }
