@@ -7,24 +7,16 @@ import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,35 +39,31 @@ class TimeWarningBanner(service: AccessibilityService) {
     private val handler = Handler(Looper.getMainLooper())
     private var view: ComposeView? = null
     private var owner: OverlayOwner? = null
-    private var visibility: MutableTransitionState<Boolean>? = null
 
     fun show(title: String, subtitle: String, colorArgb: Long) {
         remove()
-        val state = MutableTransitionState(false).apply { targetState = true }
         val o = OverlayOwner().also { it.start() }
         val accent = Color(colorArgb.toInt())
+        // Content is laid out at full size from the first frame (a window that starts empty can
+        // stay 0×0 on some devices); fading is done on the View instead.
         val v = ComposeView(context).apply {
             setViewTreeLifecycleOwner(o)
             setViewTreeSavedStateRegistryOwner(o)
+            alpha = 0f
+            translationY = 24f * resources.displayMetrics.density
             setContent {
-                AnimatedVisibility(
-                    visibleState = remember { state },
-                    enter = fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 2 },
-                    exit = fadeOut(tween(400)),
+                Row(
+                    Modifier
+                        .padding(horizontal = 24.dp)
+                        .background(Color(0xF0151929), RoundedCornerShape(20.dp))
+                        .padding(start = 12.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(
-                        Modifier
-                            .padding(horizontal = 24.dp)
-                            .background(Color(0xF0151929), RoundedCornerShape(20.dp))
-                            .padding(start = 12.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Box(Modifier.width(4.dp).height(36.dp).fillMaxHeight().background(accent, RoundedCornerShape(2.dp)))
-                        Column {
-                            Text(title, color = Color.White, style = Typography.titleSmall)
-                            Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.labelMedium)
-                        }
+                    Box(Modifier.width(4.dp).height(36.dp).background(accent, RoundedCornerShape(2.dp)))
+                    Column {
+                        Text(title, color = Color.White, style = Typography.titleSmall)
+                        Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.labelMedium)
                     }
                 }
             }
@@ -101,23 +89,28 @@ class TimeWarningBanner(service: AccessibilityService) {
         Log.i(TAG, "Time warning banner: $title ($subtitle)")
         view = v
         owner = o
-        visibility = state
-        handler.postDelayed({ visibility?.targetState = false }, SHOW_MS)
-        handler.postDelayed(::remove, SHOW_MS + FADE_MS)
+        v.animate().alpha(1f).translationY(0f).setDuration(FADE_IN_MS).start()
+        handler.postDelayed({
+            view?.animate()?.alpha(0f)?.setDuration(FADE_OUT_MS)?.withEndAction(::remove)?.start()
+        }, SHOW_MS)
+        handler.postDelayed(::remove, SHOW_MS + FADE_OUT_MS + 200) // in case the animation is skipped
     }
 
     fun remove() {
         handler.removeCallbacksAndMessages(null)
-        view?.let { runCatching { windowManager.removeView(it) } }
+        view?.let {
+            it.animate().cancel()
+            runCatching { windowManager.removeView(it) }
+        }
         owner?.destroy()
         view = null
         owner = null
-        visibility = null
     }
 
     private companion object {
         const val SHOW_MS = 4_500L
-        const val FADE_MS = 500L
+        const val FADE_IN_MS = 250L
+        const val FADE_OUT_MS = 400L
         const val BOTTOM_OFFSET_DP = 96f
     }
 }
