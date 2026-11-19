@@ -212,14 +212,14 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                     TextButton(onClick = { draft.targets = draft.targets - t }) { Text("Remove") }
                 }
             }
+            FilledTonalButton(onClick = { picking = true }) { Text("+ Choose apps") }
+            WebsiteAdder { domain -> if (Target.Website(domain) !in draft.targets) draft.targets = draft.targets + Target.Website(domain) }
             AdultSitesToggle(
                 checked = Target.AdultWebsites in draft.targets,
                 onChange = { on ->
                     draft.targets = if (on) draft.targets + Target.AdultWebsites else draft.targets - Target.AdultWebsites
                 },
             )
-            FilledTonalButton(onClick = { picking = true }) { Text("+ Choose apps") }
-            WebsiteAdder { domain -> if (Target.Website(domain) !in draft.targets) draft.targets = draft.targets + Target.Website(domain) }
         }
 
         SectionCard(
