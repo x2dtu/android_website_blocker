@@ -5,14 +5,15 @@ import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,41 +45,44 @@ class TimeWarningBanner(service: AccessibilityService) {
         remove()
         val o = OverlayOwner().also { it.start() }
         val accent = Color(colorArgb.toInt())
-        // Content is laid out at full size from the first frame (a window that starts empty can
-        // stay 0×0 on some devices); fading is done on the View instead.
         val v = ComposeView(context).apply {
             setViewTreeLifecycleOwner(o)
             setViewTreeSavedStateRegistryOwner(o)
             alpha = 0f
-            translationY = 24f * resources.displayMetrics.density
             setContent {
-                Row(
-                    Modifier
-                        .padding(horizontal = 24.dp)
-                        .background(Color(0xF0151929), RoundedCornerShape(20.dp))
-                        .padding(start = 12.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                // Full-screen, see-through window; the banner sits near the bottom.
+                Box(
+                    Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = BOTTOM_OFFSET_DP.dp),
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
-                    Box(Modifier.width(4.dp).height(36.dp).background(accent, RoundedCornerShape(2.dp)))
-                    Column {
-                        Text(title, color = Color.White, style = Typography.titleSmall)
-                        Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.labelMedium)
+                    Row(
+                        Modifier
+                            .padding(horizontal = 24.dp)
+                            .background(Color(0xF0151929), RoundedCornerShape(20.dp))
+                            .padding(start = 12.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(Modifier.width(4.dp).height(36.dp).background(accent, RoundedCornerShape(2.dp)))
+                        Column {
+                            Text(title, color = Color.White, style = Typography.titleSmall)
+                            Text(subtitle, color = Color(0xFFB4B9D2), style = Typography.labelMedium)
+                        }
                     }
                 }
             }
         }
+        // Same window type and size as the (known-good) fallback block screen, but see-through and
+        // ignoring touches, so the app underneath stays fully usable.
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = (context.resources.displayMetrics.density * BOTTOM_OFFSET_DP).toInt() // clear of the nav bar
-            setTitle("NightBlocker time warning")
-        }
+        ).apply { setTitle("NightBlocker time warning") }
         try {
             windowManager.addView(v, params)
         } catch (e: RuntimeException) {
@@ -89,7 +93,11 @@ class TimeWarningBanner(service: AccessibilityService) {
         Log.i(TAG, "Time warning banner: $title ($subtitle)")
         view = v
         owner = o
-        v.animate().alpha(1f).translationY(0f).setDuration(FADE_IN_MS).start()
+        v.animate().alpha(1f).setDuration(FADE_IN_MS).start()
+        // Diagnostics: confirms the window really laid out and is visible.
+        v.postDelayed({
+            Log.i(TAG, "Banner window: ${v.width}x${v.height}, shown=${v.isShown}, attached=${v.isAttachedToWindow}, alpha=${v.alpha}")
+        }, 1_000)
         handler.postDelayed({
             view?.animate()?.alpha(0f)?.setDuration(FADE_OUT_MS)?.withEndAction(::remove)?.start()
         }, SHOW_MS)
