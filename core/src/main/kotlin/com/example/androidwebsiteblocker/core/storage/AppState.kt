@@ -76,6 +76,7 @@ private data class SetDto(
     val perOpenLimitMs: Long?,
     val totalLimitMs: Long?,
     val graceMs: Long,
+    val timeWarnings: Boolean = true,
     val suspensionMs: Long,
     val maxSuspensions: Int?,
     val suspensionCooldownMs: Long,
@@ -103,6 +104,7 @@ private data class UsageDto(
     val sessionUsedMs: Long? = null,
     val sessionLeftAt: Long? = null,
     val opens: List<OpenDto> = emptyList(),
+    val warned: List<Int> = emptyList(),
 )
 
 @Serializable
@@ -127,7 +129,7 @@ private fun AppState.toDto() = StateDto(
     usage = usage.map { (k, u) ->
         UsageDto(k.setId, k.target.toDto(), k.occurrenceKey, u.opensUsed, u.timeUsed.toMillis(),
             u.session?.used?.toMillis(), u.session?.leftAt?.toEpochMilli(),
-            u.opens.map { OpenDto(it.startedAt.toEpochMilli(), it.used.toMillis()) })
+            u.opens.map { OpenDto(it.startedAt.toEpochMilli(), it.used.toMillis()) }, u.warned.sorted())
     },
     suspensions = suspensions.map { (id, s) -> SuspensionDto(id, s.occurrenceKey, s.used, s.lastEndsAt?.toEpochMilli()) },
     pendingChanges = pendingChanges.values.map { PendingDto(it.proposed.toDto(), it.requestedAt.toEpochMilli(), it.appliesAt.toEpochMilli()) },
@@ -143,6 +145,7 @@ private fun StateDto.toDomain() = AppState(
             timeUsed = Duration.ofMillis(u.timeUsedMs),
             session = u.sessionUsedMs?.let { OpenSession(Duration.ofMillis(it), u.sessionLeftAt?.let(Instant::ofEpochMilli)) },
             opens = u.opens.map { OpenRecord(Instant.ofEpochMilli(it.startedAt), Duration.ofMillis(it.usedMs)) },
+            warned = u.warned.toSet(),
         )
     },
     suspensions = suspensions.associate { it.setId to SuspensionState(it.occurrence, it.used, it.lastEndsAt?.let(Instant::ofEpochMilli)) },
@@ -163,6 +166,7 @@ private fun BlockSet.toDto() = SetDto(
     perOpenLimitMs = softLimits.perOpenLimit?.toMillis(),
     totalLimitMs = softLimits.totalLimit?.toMillis(),
     graceMs = softLimits.graceTime.toMillis(),
+    timeWarnings = softLimits.timeWarnings,
     suspensionMs = protection.suspensionDuration.toMillis(),
     maxSuspensions = protection.maxSuspensions,
     suspensionCooldownMs = protection.suspensionCooldown.toMillis(),
@@ -181,6 +185,7 @@ private fun SetDto.toDomain() = BlockSet(
         perOpenLimit = perOpenLimitMs?.let(Duration::ofMillis),
         totalLimit = totalLimitMs?.let(Duration::ofMillis),
         graceTime = Duration.ofMillis(graceMs),
+        timeWarnings = timeWarnings,
     ),
     protection = ProtectionSettings(
         suspensionDuration = Duration.ofMillis(suspensionMs),

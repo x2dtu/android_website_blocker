@@ -25,7 +25,12 @@ data class SoftUsage(
     val session: OpenSession? = null,
     /** Every open this window, oldest first. The last one is the current open if [session] is live. */
     val opens: List<OpenRecord> = emptyList(),
+    /** Time-warning thresholds (minutes left) already sent this window. */
+    val warned: Set<Int> = emptySet(),
 )
+
+/** "[target] has [threshold] of total time left" for one soft block set. */
+data class TimeWarning(val setId: String, val setName: String, val target: Target, val threshold: Duration)
 
 /**
  * Decides whether the foreground app/site is allowed, and does the screen-time accounting.
@@ -44,6 +49,9 @@ data class SoftUsage(
  *    enabled, non-suspended window. It counts against every soft set that matches the target.
  *  - Leaving and returning within the set's grace time continues the same open.
  */
+/** Minutes-left marks for [TimeWarning]s. */
+val WARNING_MINUTES = listOf(10, 1)
+
 class BlockEngine(
     private val zone: ZoneId,
     sets: List<BlockSet> = emptyList(),
@@ -162,7 +170,51 @@ class BlockEngine(
             set.suspendedUntil?.takeIf { it.isAfter(now) }?.let { candidates += it }
         }
         (evaluate(foreground, now) as? Decision.InSession)?.remaining?.let { candidates += now.plus(it) }
+        upcomingWarnings(now).forEach { candidates += it }
         return candidates.minOrNull()
+    }
+
+    /**
+     * Time warnings that are due now for what's on screen; each is returned once per window.
+     * Call after [tick] / [onForegroundChanged]. If several are due at once, only the most
+     * urgent is returned (the others are marked as sent).
+     */
+    fun collectTimeWarnings(now: Instant): List<TimeWarning> {
+        val fg = foreground ?: return emptyList()
+        if (evaluate(fg, now) !is Decision.InSession) return emptyList()
+        val due = mutableListOf<TimeWarning>()
+        for (pair in warnablePairs(fg, now)) {
+            val u = _usage.getValue(pair.key)
+            val total = pair.set.softLimits.totalLimit!!
+            val left = total - u.timeUsed
+            val thresholds = WARNING_MINUTES.filter { m -> m !in u.warned && Duration.ofMinutes(m.toLong()) < total && left <= Duration.ofMinutes(m.toLong()) }
+            if (thresholds.isEmpty() || left <= Duration.ZERO) continue
+            _usage[pair.key] = u.copy(warned = u.warned + thresholds)
+            val mostUrgent = thresholds.min()
+            due += TimeWarning(pair.set.id, pair.set.name, pair.target, Duration.ofMinutes(mostUrgent.toLong()))
+        }
+        return due
+    }
+
+    /** When each pending warning for what's on screen will be due, assuming it stays on screen. */
+    private fun upcomingWarnings(now: Instant): List<Instant> {
+        val fg = foreground ?: return emptyList()
+        if (evaluate(fg, now) !is Decision.InSession) return emptyList()
+        return warnablePairs(fg, now).flatMap { pair ->
+            val u = _usage.getValue(pair.key)
+            val total = pair.set.softLimits.totalLimit!!
+            val left = total - u.timeUsed
+            WARNING_MINUTES.map { Duration.ofMinutes(it.toLong()) to it }
+                .filter { (d, m) -> m !in u.warned && d < total && left > d }
+                .map { (d, _) -> now.plus(left - d) }
+        }
+    }
+
+    /** Soft pairs on screen with a live open, a total limit, and warnings turned on. */
+    private fun warnablePairs(fg: Foreground, now: Instant): List<ActivePair> = activePairs(fg, now).filter { pair ->
+        val l = pair.set.softLimits
+        val u = _usage[pair.key]
+        pair.set.mode == BlockMode.SOFT && l.timeWarnings && l.totalLimit != null && u != null && liveSession(u, l, now) != null
     }
 
     private data class ActivePair(val set: BlockSet, val target: Target, val occurrence: WindowOccurrence) {

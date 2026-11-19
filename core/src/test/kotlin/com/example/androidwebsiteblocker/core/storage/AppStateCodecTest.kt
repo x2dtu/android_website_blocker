@@ -31,7 +31,7 @@ class AppStateCodecTest {
         id = "s1", name = "Night Socials", mode = BlockMode.SOFT,
         targets = setOf(Target.App("com.instagram.android"), Target.Website("reddit.com"), Target.AdultWebsites),
         schedule = WeeklySchedule(listOf(DayWindow(DayOfWeek.SUNDAY, 0, 480), DayWindow(DayOfWeek.SATURDAY, 1380, MINUTES_PER_DAY))),
-        softLimits = SoftLimits(Duration.ofSeconds(10), 4, Duration.ofMinutes(3), Duration.ofMinutes(12), Duration.ofSeconds(20)),
+        softLimits = SoftLimits(Duration.ofSeconds(10), 4, Duration.ofMinutes(3), Duration.ofMinutes(12), Duration.ofSeconds(20), timeWarnings = false),
         protection = ProtectionSettings(Duration.ofMinutes(2), null, Duration.ofSeconds(45), Duration.ofMinutes(7)),
         message = "Sleep is a superpower",
         colorArgb = 0xFF00897B,
@@ -45,7 +45,8 @@ class AppStateCodecTest {
         usage = mapOf(
             UsageKey("s1", Target.Website("reddit.com"), "2026-11-14T23:00") to
                 SoftUsage(2, Duration.ofMinutes(5), OpenSession(Duration.ofSeconds(30), now),
-                    listOf(OpenRecord(now.minusSeconds(600), Duration.ofMinutes(4)), OpenRecord(now.minusSeconds(60), Duration.ofSeconds(30)))),
+                    listOf(OpenRecord(now.minusSeconds(600), Duration.ofMinutes(4)), OpenRecord(now.minusSeconds(60), Duration.ofSeconds(30))),
+                    warned = setOf(10)),
             UsageKey("s1", Target.App("com.instagram.android"), "2026-11-14T23:00") to SoftUsage(1, Duration.ofMinutes(1)),
         ),
         suspensions = mapOf("s1" to SuspensionState("2026-11-14T23:00", 1, now)),

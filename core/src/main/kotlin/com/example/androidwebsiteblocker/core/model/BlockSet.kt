@@ -48,6 +48,8 @@ data class SoftLimits(
     val totalLimit: Duration? = null,
     /** Returning to the target within this time continues the same open instead of starting a new one. */
     val graceTime: Duration = Duration.ofSeconds(15),
+    /** Notify at 10 min and 1 min of [totalLimit] left. */
+    val timeWarnings: Boolean = true,
 ) {
     init {
         require(!unlockDelay.isNegative && !graceTime.isNegative)
