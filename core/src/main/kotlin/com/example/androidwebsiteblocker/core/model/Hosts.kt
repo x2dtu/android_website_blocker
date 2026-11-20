@@ -20,5 +20,12 @@ fun hostFromAddressBar(text: String): String? {
     return host
 }
 
+/**
+ * Like [hostFromAddressBar], but also finds the site inside a spoken-style label, e.g. Firefox's
+ * address bar description " hltv.org. Search or enter address" → "hltv.org".
+ */
+fun hostFromAddressLabel(text: String): String? =
+    hostFromAddressBar(text) ?: text.trim().split(Regex("\\s+")).firstNotNullOfOrNull(::hostFromAddressBar)
+
 /** Normalizes user-entered website text to a domain for a [Target.Website], or null if invalid. Drops a leading "www.". */
 fun domainFromUserInput(text: String): String? = hostFromAddressBar(text)?.removePrefix("www.")

@@ -20,6 +20,13 @@ class HostsTest {
         assertNull(hostFromAddressBar("chrome://newtab"))
     }
 
+    @Test fun `finds the site inside an address bar description`() {
+        assertEquals("hltv.org", hostFromAddressLabel(" hltv.org. Search or enter address"))
+        assertEquals("old.reddit.com", hostFromAddressLabel("old.reddit.com/r/android"))
+        assertNull(hostFromAddressLabel("Search or enter address"))
+        assertNull(hostFromAddressLabel("Non-private Tabs Open: 2. Tap to switch tabs."))
+    }
+
     @Test fun `user input drops www`() {
         assertEquals("reddit.com", domainFromUserInput("https://www.reddit.com/"))
         assertEquals("m.youtube.com", domainFromUserInput("m.youtube.com"))

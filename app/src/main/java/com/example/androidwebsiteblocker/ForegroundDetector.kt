@@ -8,6 +8,7 @@ import android.view.accessibility.AccessibilityWindowInfo
 import com.example.androidwebsiteblocker.blocking.BlockOverlay
 import com.example.androidwebsiteblocker.core.model.Foreground
 import com.example.androidwebsiteblocker.core.model.hostFromAddressBar
+import com.example.androidwebsiteblocker.core.model.hostFromAddressLabel
 
 /**
  * Works out what the user is actually looking at.
@@ -54,7 +55,7 @@ class ForegroundDetector(private val service: AccessibilityService) {
             ?: findAddressField(root, browser.packageName)
         if (urlBar != null && !urlBar.isFocused) {
             // Non-URL text (e.g. "Search or type URL" on a new tab page) means no site.
-            lastHost[browser.packageName] = hostFromAddressBar(urlBar.text?.toString().orEmpty())
+            lastHost[browser.packageName] = addressOf(urlBar)
         }
         return lastHost[browser.packageName]
     }
@@ -78,14 +79,21 @@ class ForegroundDetector(private val service: AccessibilityService) {
             if (SKIP_HINTS.any(id::contains)) continue // suggestions list shows other sites' URLs
             val isToolbar = inToolbar || TOOLBAR_HINTS.any(id::contains)
             val ownUi = id.isEmpty() || id.startsWith("${pkg.lowercase()}:id/") || !id.contains(":id/")
-            val text = node.text?.toString()
-            if (ownUi && text != null && (isToolbar || cls.endsWith("EditText")) && hostFromAddressBar(text) != null) {
+            if (ownUi && (isToolbar || cls.endsWith("EditText")) && addressOf(node) != null) {
                 return node
             }
             for (i in 0 until node.childCount) node.getChild(i)?.let { queue.add(it to isToolbar) }
         }
         return null
     }
+
+    /**
+     * The site shown by an address bar element: its text, or — for toolbars like Firefox's that
+     * leave the text empty — its description (" hltv.org. Search or enter address").
+     */
+    private fun addressOf(node: AccessibilityNodeInfo): String? =
+        node.text?.toString()?.let(::hostFromAddressBar)
+            ?: node.contentDescription?.toString()?.let(::hostFromAddressLabel)
 
     private companion object {
         const val MAX_SCAN_NODES = 400
