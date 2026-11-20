@@ -9,7 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.net.toUri
-import com.example.androidwebsiteblocker.CHROME_PACKAGE
+import com.example.androidwebsiteblocker.Browsers
 import com.example.androidwebsiteblocker.TAG
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.Foreground
@@ -92,13 +92,13 @@ class BlockController(private val service: AccessibilityService, private val sto
     private fun unlock() = handle(engine.unlock(now()))
 
     /**
-     * The block screen's exit (button or Back). For a blocked website in Chrome, opens a fresh
-     * tab instead of going home — otherwise reopening Chrome lands straight back on the blocked
-     * tab. The blocked tab and its history are left alone.
+     * The block screen's exit (button or Back). For a blocked website, opens a fresh tab in the
+     * same browser instead of going home — otherwise reopening the browser lands straight back
+     * on the blocked tab. The blocked tab and its history are left alone.
      */
     private fun leave() {
         val fg = engine.foreground
-        if (fg != null && isWebsiteBlock(fg) && openSafeTab()) return
+        if (fg != null && isWebsiteBlock(fg) && openSafeTab(fg.packageName)) return
         goHome()
     }
 
@@ -108,33 +108,33 @@ class BlockController(private val service: AccessibilityService, private val sto
 
     /**
      * True when a website is part of what's blocked (hard or soft) and a new tab would actually
-     * get you out — i.e. Chrome itself isn't hard-blocked or out of opens. If Chrome is only
-     * soft-blocked, the new tab may show Chrome's own soft block screen, which is fine.
+     * get you out — i.e. the browser itself isn't hard-blocked or out of opens. If the browser is
+     * only soft-blocked, the new tab may show the browser's own soft block screen, which is fine.
      */
     private fun isWebsiteBlock(fg: Foreground): Boolean {
-        if (fg.packageName != CHROME_PACKAGE || fg.host == null) return false
+        if (!Browsers.isBrowser(fg.packageName) || fg.host == null) return false
         val targets = when (val d = engine.evaluate(fg, now())) {
             is Decision.Blocked -> d.blockers.map { concrete(it.setId, it.target, fg) }
             is Decision.SoftGate -> d.gates.map { concrete(it.setId, it.target, fg) }
             else -> return false
         }
-        return targets.any { it is Target.Website || it == Target.AdultWebsites } && engine.evaluate(Foreground(CHROME_PACKAGE), now()) !is Decision.Blocked
+        return targets.any { it is Target.Website || it == Target.AdultWebsites } && engine.evaluate(Foreground(fg.packageName), now()) !is Decision.Blocked
     }
 
-    private fun openSafeTab(): Boolean {
+    private fun openSafeTab(browserPackage: String): Boolean {
         val host = SAFE_TAB_URL.toUri().host
-        if (engine.evaluate(Foreground(CHROME_PACKAGE, host), now()) is Decision.Blocked) return false
+        if (engine.evaluate(Foreground(browserPackage, host), now()) is Decision.Blocked) return false
         val intent = Intent(Intent.ACTION_VIEW, SAFE_TAB_URL.toUri()).apply {
-            setPackage(CHROME_PACKAGE)
+            setPackage(browserPackage)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            // Chrome reuses one tab per application id, so repeated exits don't pile up tabs.
+            // Chromium browsers reuse one tab per application id, so repeated exits don't pile up tabs.
             putExtra(Browser.EXTRA_APPLICATION_ID, service.packageName)
         }
         return try {
             service.startActivity(intent)
             true
         } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "Couldn't open a new Chrome tab", e)
+            Log.w(TAG, "Couldn't open a new tab in $browserPackage", e)
             false
         }
     }

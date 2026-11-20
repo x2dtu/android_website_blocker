@@ -9,13 +9,16 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.content.ContextCompat
 import com.example.androidwebsiteblocker.blocking.BlockController
 import com.example.androidwebsiteblocker.blocking.BlockScreenHost
+import com.example.androidwebsiteblocker.blocking.DebugHooks
 import com.example.androidwebsiteblocker.data.AdultSiteList
 import com.example.androidwebsiteblocker.data.StateStore
 
 const val TAG = "NightBlocker"
+private const val INSPECT_TAG = "NightBlocker-Inspect"
 
 /**
  * Long-lived component the system binds once the user enables it in Accessibility settings.
@@ -57,6 +60,7 @@ class NightBlockerService : AccessibilityService() {
         controller = BlockController(this, StateStore.get(this)).also { it.start() }
         // If the block screen gets covered (user switched apps), re-check what's really on screen.
         BlockScreenHost.onHiddenWhileBlocking = { refresh() }
+        DebugHooks.inspectScreen = ::inspectScreen
         ForegroundMonitor.setServiceConnected(true)
         // Always hand the new controller the current foreground, even if the monitor already
         // has it (service restarted while the same app stayed on screen).
@@ -69,9 +73,9 @@ class NightBlockerService : AccessibilityService() {
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> refresh()
-            // Content changes are frequent; only Chrome needs them (address bar updates).
+            // Content changes are frequent; only browsers need them (address bar updates).
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ->
-                if (event.packageName == CHROME_PACKAGE) refresh()
+                if (Browsers.isBrowser(event.packageName)) refresh()
         }
     }
 
@@ -94,6 +98,26 @@ class NightBlockerService : AccessibilityService() {
         controller?.onConfigurationChanged()
     }
 
+    /**
+     * Logs the current app's UI tree (class, view ID, text) to Logcat under "NightBlocker-Inspect",
+     * to find a browser's address bar ID. Returns a short summary.
+     */
+    private fun inspectScreen(): String {
+        val root = detector.activeAppRoot() ?: return "No app window found"
+        val pkg = root.packageName?.toString() ?: "?"
+        var count = 0
+        fun dump(node: AccessibilityNodeInfo, depth: Int) {
+            if (count >= 600) return
+            count++
+            val text = node.text?.toString()?.take(80)?.replace("\n", " ")
+            Log.i(INSPECT_TAG, "  ".repeat(depth) + "${node.className} id=${node.viewIdResourceName} text=$text focused=${node.isFocused}")
+            for (i in 0 until node.childCount) node.getChild(i)?.let { dump(it, depth + 1) }
+        }
+        Log.i(INSPECT_TAG, "=== $pkg (detected site: ${detector.detect()?.host}) ===")
+        dump(root, 0)
+        return "Logged $count UI elements for $pkg — detected site: ${detector.detect()?.host ?: "none"}"
+    }
+
     override fun onInterrupt() {
         Log.i(TAG, "Service interrupted")
     }
@@ -101,6 +125,7 @@ class NightBlockerService : AccessibilityService() {
     override fun onDestroy() {
         controller?.stop()
         controller = null
+        DebugHooks.inspectScreen = null
         if (::detector.isInitialized) {
             unregisterReceiver(screenReceiver)
             unregisterReceiver(timeReceiver)

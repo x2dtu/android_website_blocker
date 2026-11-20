@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.androidwebsiteblocker.Browsers
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.DEFAULT_REMINDER_INTERVAL
@@ -235,8 +236,9 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
         SectionCard(
             "Apps & websites",
             subtitle = "${draft.targets.size} selected",
-            info = "Apps are blocked whenever they're on screen. Websites are blocked in Chrome, including all their subdomains " +
-                "(reddit.com also covers old.reddit.com). When a website is blocked, leaving opens a new tab so your other tabs stay put.",
+            info = "Apps are blocked whenever they're on screen. Websites include all their subdomains " +
+                "(reddit.com also covers old.reddit.com). When a website is blocked, leaving opens a new tab so your other tabs stay put.\n\n" +
+                Browsers.supportText,
         ) {
             draft.targets.filter { it != Target.AdultWebsites }.forEach { t ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -479,14 +481,13 @@ private fun AdultSitesToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
         BadgeIcon("18+", 36.dp)
         Column(Modifier.weight(1f)) {
             Text("Block adult websites", style = MaterialTheme.typography.bodyLarge)
-            Hint("${AdultSiteList.approxSizeLabel()} known sites, in Chrome")
+            Hint("${AdultSiteList.approxSizeLabel()} known sites, in supported browsers")
         }
         InfoButton(
             "Block adult websites",
             "Blocks every site on a bundled list of ${AdultSiteList.approxSizeLabel()} adult domains (and their subdomains), " +
                 "from The Block List Project, last updated ${AdultSiteList.LIST_DATE}. They count as one item for soft-block limits.\n\n" +
-                "Works in Chrome only. To close the gap, add other browsers (Samsung Internet, Firefox, …) as apps " +
-                "in a hard block set. Brand-new sites may not be on the list yet.",
+                "Brand-new sites may not be on the list yet.\n\n" + Browsers.supportText,
         )
         Switch(checked = checked, onCheckedChange = onChange)
     }
