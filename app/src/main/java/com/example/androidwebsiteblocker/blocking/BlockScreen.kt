@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.Target
-import com.example.androidwebsiteblocker.core.policy.formatDuration
 import com.example.androidwebsiteblocker.ui.TargetIcon
 import com.example.androidwebsiteblocker.ui.theme.Typography
 import java.time.Duration
@@ -165,7 +164,7 @@ private fun SoftControls(
     // "2/4 opens left · 8 min of 12 min left" — whichever parts apply.
     val stats = listOfNotNull(
         soft.maxOpens?.let { "${it - soft.opensUsed}/$it opens left" },
-        if (soft.timeLeft != null && soft.totalLimit != null) "${formatDuration(soft.timeLeft)} of ${formatDuration(soft.totalLimit)} left" else null,
+        if (soft.timeLeft != null && soft.totalLimit != null) timeLeftText(soft.timeLeft, soft.totalLimit) else null,
     )
     if (stats.isNotEmpty()) {
         Text(stats.joinToString(" · "), color = Color.White, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
@@ -196,6 +195,13 @@ private fun SoftControls(
         Text(if (secondsLeft > 0) "Continue in ${secondsLeft}s" else "Continue to app", style = MaterialTheme.typography.titleMedium)
     }
     TextButton(onClick = onGoHome, modifier = Modifier.fillMaxWidth()) { Text(leaveLabel, color = Color.White) }
+}
+
+/** "8 of 20 min left" (seconds dropped), or "<1 min of 20 min left" in the last minute. */
+internal fun timeLeftText(left: Duration, total: Duration): String {
+    val totalMin = total.toMinutes()
+    val leftMin = left.toMinutes()
+    return if (leftMin < 1) "<1 min of $totalMin min left" else "$leftMin of $totalMin min left"
 }
 
 /**
