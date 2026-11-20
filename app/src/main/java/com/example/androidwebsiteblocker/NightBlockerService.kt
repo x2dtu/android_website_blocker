@@ -109,8 +109,16 @@ class NightBlockerService : AccessibilityService() {
         fun dump(node: AccessibilityNodeInfo, depth: Int) {
             if (count >= 600) return
             count++
+            val cls = node.className?.toString().orEmpty()
             val text = node.text?.toString()?.take(80)?.replace("\n", " ")
-            Log.i(INSPECT_TAG, "  ".repeat(depth) + "${node.className} id=${node.viewIdResourceName} text=$text focused=${node.isFocused}")
+            val desc = node.contentDescription?.toString()?.take(80)
+            Log.i(INSPECT_TAG, "  ".repeat(depth) + "$cls id=${node.viewIdResourceName} text=$text desc=$desc focused=${node.isFocused}")
+            if (cls.contains("WebView") || cls.contains("GeckoView")) {
+                // Page content isn't the browser's UI; log only what the page element carries.
+                val extras = node.extras.keySet().joinToString { k -> "$k=${node.extras.get(k)}" }
+                Log.i(INSPECT_TAG, "  ".repeat(depth + 1) + "[web page content skipped] extras={$extras}")
+                return
+            }
             for (i in 0 until node.childCount) node.getChild(i)?.let { dump(it, depth + 1) }
         }
         Log.i(INSPECT_TAG, "=== $pkg (detected site: ${detector.detect()?.host}) ===")
