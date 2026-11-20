@@ -32,11 +32,11 @@ object Browsers {
         ),
         Browser(
             "org.mozilla.firefox", "Firefox",
-            listOf("org.mozilla.firefox:id/mozac_browser_toolbar_url_view", "org.mozilla.firefox:id/url_bar_title"),
+            listOf("org.mozilla.firefox:id/mozac_browser_toolbar_url_view", "org.mozilla.firefox:id/url_bar_title", "ADDRESSBAR_URL_BOX", "ADDRESSBAR_SEARCH_BOX"),
         ),
         Browser(
             "org.mozilla.firefox_beta", "Firefox Beta",
-            listOf("org.mozilla.firefox_beta:id/mozac_browser_toolbar_url_view", "org.mozilla.firefox_beta:id/url_bar_title"),
+            listOf("org.mozilla.firefox_beta:id/mozac_browser_toolbar_url_view", "org.mozilla.firefox_beta:id/url_bar_title", "ADDRESSBAR_URL_BOX", "ADDRESSBAR_SEARCH_BOX"),
         ),
     )
 

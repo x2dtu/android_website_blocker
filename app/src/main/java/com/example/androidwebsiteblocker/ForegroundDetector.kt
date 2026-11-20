@@ -60,31 +60,36 @@ class ForegroundDetector(private val service: AccessibilityService) {
     }
 
     /**
-     * Fallback when no known address bar ID matches: the first text field in the browser's own UI
-     * (never inside the web page) whose text looks like a site address.
+     * Fallback when no known address bar ID matches: a site address in the browser's own toolbar
+     * (or any address-like text field), never in the web page or the suggestions list.
+     *
+     * Handles toolbars built with Jetpack Compose (e.g. newer Firefox), whose element names have
+     * no package prefix ("ADDRESSBAR_SEARCH_BOX", "composable_toolbar").
      */
     private fun findAddressField(root: AccessibilityNodeInfo, pkg: String): AccessibilityNodeInfo? {
-        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(root) }
+        val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Boolean>>().apply { add(root to false) }
         var visited = 0
         while (queue.isNotEmpty() && visited < MAX_SCAN_NODES) {
-            val node = queue.removeFirst()
+            val (node, inToolbar) = queue.removeFirst()
             visited++
             val cls = node.className?.toString().orEmpty()
             if (cls.contains("WebView") || cls.contains("GeckoView")) continue // page content
-            val id = node.viewIdResourceName
-            val ownUi = id == null || id.startsWith("$pkg:id/")
+            val id = node.viewIdResourceName?.lowercase().orEmpty()
+            if (SKIP_HINTS.any(id::contains)) continue // suggestions list shows other sites' URLs
+            val isToolbar = inToolbar || TOOLBAR_HINTS.any(id::contains)
+            val ownUi = id.isEmpty() || id.startsWith("${pkg.lowercase()}:id/") || !id.contains(":id/")
             val text = node.text?.toString()
-            if (ownUi && text != null && (cls.endsWith("EditText") || id?.contains("url") == true || id?.contains("toolbar") == true) &&
-                hostFromAddressBar(text) != null
-            ) {
+            if (ownUi && text != null && (isToolbar || cls.endsWith("EditText")) && hostFromAddressBar(text) != null) {
                 return node
             }
-            for (i in 0 until node.childCount) node.getChild(i)?.let(queue::add)
+            for (i in 0 until node.childCount) node.getChild(i)?.let { queue.add(it to isToolbar) }
         }
         return null
     }
 
     private companion object {
         const val MAX_SCAN_NODES = 400
+        val TOOLBAR_HINTS = listOf("toolbar", "addressbar", "address_bar", "url", "omnibox", "location_bar")
+        val SKIP_HINTS = listOf("awesomebar", "suggestion")
     }
 }
