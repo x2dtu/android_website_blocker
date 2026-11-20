@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.core.model.Target
+import com.example.androidwebsiteblocker.core.policy.formatDuration
 import com.example.androidwebsiteblocker.ui.TargetIcon
 import com.example.androidwebsiteblocker.ui.theme.Typography
 import java.time.Duration
@@ -69,7 +70,10 @@ data class SoftGateInfo(
     val unlockDelay: Duration,
     val opensUsed: Int,
     val maxOpens: Int?,
-    /** e.g. "3 min per open · 12 min total". */
+    /** Total time left this window, if the set has a total limit. */
+    val timeLeft: Duration? = null,
+    val totalLimit: Duration? = null,
+    /** e.g. "3 min per open". */
     val limitsSummary: String,
 )
 
@@ -157,9 +161,14 @@ private fun SoftControls(
     onGoHome: () -> Unit,
     onContinue: () -> Unit,
 ) {
-    if (soft.maxOpens != null) {
-        OpenDots(used = soft.opensUsed, max = soft.maxOpens, accent = accent)
-        Text("${soft.maxOpens - soft.opensUsed}/${soft.maxOpens} opens left", color = Color.White, style = MaterialTheme.typography.titleMedium)
+    if (soft.maxOpens != null) OpenDots(used = soft.opensUsed, max = soft.maxOpens, accent = accent)
+    // "2/4 opens left · 8 min of 12 min left" — whichever parts apply.
+    val stats = listOfNotNull(
+        soft.maxOpens?.let { "${it - soft.opensUsed}/$it opens left" },
+        if (soft.timeLeft != null && soft.totalLimit != null) "${formatDuration(soft.timeLeft)} of ${formatDuration(soft.totalLimit)} left" else null,
+    )
+    if (stats.isNotEmpty()) {
+        Text(stats.joinToString(" · "), color = Color.White, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
     }
     if (soft.limitsSummary.isNotBlank()) {
         Text(soft.limitsSummary, color = Muted, style = MaterialTheme.typography.bodySmall)

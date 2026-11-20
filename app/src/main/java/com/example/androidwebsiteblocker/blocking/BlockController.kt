@@ -221,7 +221,10 @@ class BlockController(private val service: AccessibilityService, private val sto
                         unlockDelay = decision.unlockDelay,
                         opensUsed = decision.opens?.used ?: gate.opensUsed,
                         maxOpens = decision.opens?.max,
-                        limitsSummary = limitsSummary(set),
+                        timeLeft = gate.timeLeft,
+                        totalLimit = gate.totalLimit,
+                        // Total time is shown as "X of Y left" above, so only the per-open limit here.
+                        limitsSummary = set.softLimits.perOpenLimit?.let { "${formatDuration(it)} per open" }.orEmpty(),
                     ),
                     leaveLabel = leaveLabel(fg),
                 )

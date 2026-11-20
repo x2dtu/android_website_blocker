@@ -169,6 +169,18 @@ class BlockEngineTest {
         assertEquals("Night Socials: screen time exceeded 12 min", d.primary.describe())
     }
 
+    @Test fun `gate reports total time left`() {
+        val e = engine(soft(SoftLimits(totalLimit = min(12))))
+        e.onForegroundChanged(fgA, now)
+        e.unlock(now)
+        advance(min(4))
+        e.onForegroundChanged(home, now)
+        advance(min(5))
+        val gate = (e.onForegroundChanged(fgA, now) as Decision.SoftGate).primary
+        assertEquals(min(8), gate.timeLeft)
+        assertEquals(min(12), gate.totalLimit)
+    }
+
     @Test fun `time on the block screen and with screen off does not count`() {
         val e = engine(soft(SoftLimits(totalLimit = min(10))))
         e.onForegroundChanged(fgA, now)

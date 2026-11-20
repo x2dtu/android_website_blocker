@@ -49,7 +49,18 @@ data class Blocker(
     }
 }
 
-data class Gate(val setId: String, val setName: String, val target: Target, val opensUsed: Int, val maxOpens: Int?)
+data class Gate(
+    val setId: String,
+    val setName: String,
+    val target: Target,
+    val opensUsed: Int,
+    val maxOpens: Int?,
+    /** Time used this window, for "8 min of 12 min left". */
+    val timeUsed: Duration = Duration.ZERO,
+    val totalLimit: Duration? = null,
+) {
+    val timeLeft: Duration? get() = totalLimit?.let { (it - timeUsed).coerceAtLeast(Duration.ZERO) }
+}
 
 data class OpenCount(val used: Int, val max: Int) {
     val remaining: Int get() = max - used

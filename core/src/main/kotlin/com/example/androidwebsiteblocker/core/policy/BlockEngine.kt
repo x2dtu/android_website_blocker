@@ -151,7 +151,7 @@ class BlockEngine(
                 ).minOrNull()
                 limits.maxOpens != null && u.opensUsed >= limits.maxOpens ->
                     blockers += Blocker(set.id, set.name, pair.target, BlockReason.OpensExhausted(limits.maxOpens), until)
-                else -> gates += Gate(set.id, set.name, pair.target, u.opensUsed, limits.maxOpens) to limits.unlockDelay
+                else -> gates += Gate(set.id, set.name, pair.target, u.opensUsed, limits.maxOpens, u.timeUsed, limits.totalLimit) to limits.unlockDelay
             }
         }
 
