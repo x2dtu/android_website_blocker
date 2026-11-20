@@ -25,7 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,9 +92,12 @@ fun TargetIcon(target: Target, size: Dp = 32.dp) {
 @Composable
 fun AppIcon(packageName: String, size: Dp = 32.dp) {
     val context = LocalContext.current
-    val icon by produceState(iconCache.get(packageName), packageName) {
-        if (value == null) {
-            value = withContext(Dispatchers.IO) {
+    // Keyed on the package: produceState alone keeps its old value when the key changes, so a
+    // reused screen (e.g. the block screen switching apps) kept showing the previous app's icon.
+    var icon by remember(packageName) { mutableStateOf(iconCache.get(packageName)) }
+    LaunchedEffect(packageName) {
+        if (icon == null) {
+            icon = withContext(Dispatchers.IO) {
                 try {
                     context.packageManager.getApplicationIcon(packageName).toBitmap(96, 96).asImageBitmap()
                         .also { iconCache.put(packageName, it) }
