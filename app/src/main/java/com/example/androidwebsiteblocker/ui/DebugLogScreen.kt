@@ -10,22 +10,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.ForegroundLogEntry
 import com.example.androidwebsiteblocker.ForegroundMonitor
-import com.example.androidwebsiteblocker.blocking.DebugHooks
 import com.example.androidwebsiteblocker.core.model.Foreground
-import android.os.Handler
-import android.os.Looper
-import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -38,21 +32,6 @@ fun DebugLogScreen(onBack: () -> Unit) {
     val log by ForegroundMonitor.log.collectAsState()
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item { ScreenHeader("Detection log", onBack = onBack) }
-        item {
-            val context = LocalContext.current
-            OutlinedButton(onClick = {
-                val inspect = DebugHooks.inspectScreen
-                if (inspect == null) {
-                    Toast.makeText(context, "Blocking service isn't running", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Switch to the browser — inspecting in 5 seconds", Toast.LENGTH_SHORT).show()
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        Toast.makeText(context, inspect(), Toast.LENGTH_LONG).show()
-                    }, 5_000)
-                }
-            }) { Text("Inspect browser") }
-            Hint("Logs the browser's screen layout to Logcat (tag NightBlocker-Inspect) to check site detection.")
-        }
         item {
             Text("On screen now: ${current.label()}", style = MaterialTheme.typography.bodyMedium)
             Text(

@@ -7,7 +7,8 @@ package com.example.androidwebsiteblocker
  * [urlBarIds] are the address bar's view IDs. Most Chromium-based browsers reuse Chrome's
  * toolbar, so they share Chrome's `url_bar` ID under their own package. If none is found (e.g. a
  * redesigned toolbar), [ForegroundDetector] falls back to scanning the browser's own UI for an
- * address-like text field. Use Detection log → "Inspect browser" to check a browser on a device.
+ * address-like text field. (To debug a browser, log its accessibility node tree — see git history
+ * for the removed "Inspect browser" tool.)
  */
 data class Browser(val packageName: String, val name: String, val urlBarIds: List<String>)
 
