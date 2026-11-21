@@ -1,6 +1,10 @@
 package com.example.androidwebsiteblocker
 
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.UiModeManager
+import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -85,6 +89,20 @@ class MainActivity : ComponentActivity() {
     private fun refreshPermissions() {
         serviceEnabled.value = isServiceEnabled(this)
         batteryExempt.value = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+    }
+}
+
+/** Running on a TV (Fire TV / Android TV): no battery, no touch, and no settings screens to deep-link to. */
+fun isTv(context: Context): Boolean =
+    context.getSystemService(UiModeManager::class.java).currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+
+/** Opens a settings screen; some devices (e.g. Fire TV) don't have them, so say so instead of doing nothing. */
+fun openSettings(context: Context, intent: Intent) {
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "This device doesn't have that settings screen", Toast.LENGTH_LONG).show()
     }
 }
 
@@ -179,7 +197,8 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
             state = state,
             serviceOk = serviceEnabled && connected,
             statusCard = { ServiceStatusCard(serviceEnabled, connected) },
-            setupCard = if (batteryExempt) null else ({ BatteryCard() }),
+            // TVs are always plugged in, and Fire TV has no battery settings screen.
+            setupCard = if (batteryExempt || isTv(context)) null else ({ BatteryCard() }),
             onOpenSet = { screen = "set:$it" },
             onCreate = { screen = "new" },
             onOpenLog = { screen = "log" },
@@ -207,7 +226,8 @@ private fun BatteryCard() {
                 style = MaterialTheme.typography.bodyMedium,
             )
             Button(onClick = {
-                context.startActivity(
+                openSettings(
+                    context,
                     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", context.packageName, null)),
                 )
             }) { Text("Allow") }
@@ -227,6 +247,17 @@ private fun ServiceStatusCard(enabled: Boolean, connected: Boolean) {
                 if (enabled) "Service enabled but not connected yet — try turning it off and on" else "Blocking service is off",
                 style = MaterialTheme.typography.titleMedium,
             )
+            if (isTv(context)) {
+                Text(
+                    "TVs don't let you turn this on in Settings. From your computer, with the TV connected over adb, run:\n\n" +
+                        "adb shell settings put secure enabled_accessibility_services " +
+                        "${context.packageName}/${NightBlockerService::class.java.name}\n" +
+                        "adb shell settings put secure accessibility_enabled 1\n\n" +
+                        "Then reopen Night Blocker. (Also in the README.)",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                return@Column
+            }
             Text(
                 "1. Tap \"Open Accessibility settings\".\n" +
                     "2. Find Night Blocker — on Samsung it's under \"Installed apps\" (other phones: \"Downloaded apps\").\n" +
@@ -235,11 +266,11 @@ private fun ServiceStatusCard(enabled: Boolean, connected: Boolean) {
                     "\"Allow restricted settings\", and try again.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Button(onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) {
+            Button(onClick = { openSettings(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) {
                 Text("Open Accessibility settings")
             }
             OutlinedButton(onClick = {
-                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
+                openSettings(context, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
             }) { Text("Open App info") }
         }
     }
