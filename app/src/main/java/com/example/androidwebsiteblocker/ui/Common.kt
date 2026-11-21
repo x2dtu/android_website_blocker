@@ -51,11 +51,11 @@ val SET_COLORS: List<Long> = listOf(
 
 data class InstalledApp(val packageName: String, val label: String)
 
-/** Launchable apps, excluding this one, sorted by name. */
+/** Launchable apps (phone and TV launchers), excluding this one, sorted by name. */
 suspend fun loadInstalledApps(context: Context): List<InstalledApp> = withContext(Dispatchers.IO) {
     val pm = context.packageManager
-    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-    pm.queryIntentActivities(intent, 0)
+    listOf(Intent.CATEGORY_LAUNCHER, Intent.CATEGORY_LEANBACK_LAUNCHER)
+        .flatMap { pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(it), 0) }
         .map { it.activityInfo.packageName }
         .distinct()
         .filter { it != context.packageName }
