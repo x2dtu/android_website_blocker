@@ -182,7 +182,8 @@ fun PinField(value: String, onChange: (String) -> Unit, label: String) {
         label = { Text(label) },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = formImeAction()),
+        keyboardActions = formKeyboardActions(),
         modifier = Modifier.fillMaxWidth(),
     )
 }

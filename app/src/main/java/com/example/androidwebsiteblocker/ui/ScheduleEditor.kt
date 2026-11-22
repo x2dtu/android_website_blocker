@@ -112,7 +112,7 @@ fun ScheduleEditor(windows: List<DayWindow>, color: Color, onChange: (List<DayWi
             WindowGroupRow(g, color, onClick = { editing = g }, onRemove = { onChange(windows - g.toWindows().toSet()) })
         }
         if (groups.isEmpty()) Hint("No times yet. Add when this block set should be active.")
-        FilledTonalButton(onClick = { adding = true }) { Text("+ Add time window") }
+        FilledTonalButton(onClick = { adding = true }, modifier = Modifier.fillMaxWidth()) { Text("+ Add time window") }
     }
     if (adding) {
         WindowDialog(null, onSave = { onChange(windows + it.toWindows()); adding = false }, onDismiss = { adding = false })

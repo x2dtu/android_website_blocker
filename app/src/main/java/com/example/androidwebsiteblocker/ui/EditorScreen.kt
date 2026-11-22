@@ -43,8 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -188,7 +186,6 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
     BackHandler(onBack = onCancel)
 
     val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
     val accent = draft.color.asColor()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -200,7 +197,8 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             OutlinedTextField(
                 draft.name, { draft.name = it }, label = { Text("Name") }, placeholder = { Text("e.g. Bedtime, Work focus") },
                 singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = formImeAction()),
+                keyboardActions = formKeyboardActions(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SET_COLORS.forEach { c ->
@@ -255,7 +253,8 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                     TextButton(onClick = { draft.targets = draft.targets - t }) { Text("Remove") }
                 }
             }
-            FilledTonalButton(onClick = { picking = true }) { Text("+ Choose apps") }
+            // Full width so the remote's Down reaches it from anything above (not just from the left).
+            FilledTonalButton(onClick = { picking = true }, modifier = Modifier.fillMaxWidth()) { Text("+ Choose apps") }
             WebsiteAdder { domain -> if (Target.Website(domain) !in draft.targets) draft.targets = draft.targets + Target.Website(domain) }
             AdultSitesToggle(
                 checked = Target.AdultWebsites in draft.targets,
@@ -373,8 +372,8 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
                 // Single line on TVs: Fire TV's keyboard traps you in multi-line fields.
                 singleLine = isTv(context),
                 maxLines = 4,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = formImeAction()),
+                keyboardActions = formKeyboardActions(),
             )
         }
 
@@ -509,7 +508,8 @@ private fun WebsiteAdder(onAdd: (String) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             text, { text = it }, label = { Text("Add a website") }, placeholder = { Text("reddit.com") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = formImeAction()),
+            keyboardActions = formKeyboardActions(),
             shape = MaterialTheme.shapes.medium,
             supportingText = { Text(domain?.let { "Blocks $it and its subdomains" } ?: "Domain only, no https:// needed") },
             modifier = Modifier.weight(1f),

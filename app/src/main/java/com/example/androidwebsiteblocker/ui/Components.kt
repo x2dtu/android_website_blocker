@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActionScope
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -32,10 +34,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.androidwebsiteblocker.isTv
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+/**
+ * Keyboard behavior for form fields. On TVs, Fire TV's full-screen keyboard sends "Next" even for
+ * Done and would jump into the next text box, so both just close the keyboard and return to the
+ * form (the remote moves on from there). On phones, Next moves to the next box as usual.
+ */
+@Composable
+fun formKeyboardActions(): KeyboardActions {
+    val context = LocalContext.current
+    if (!isTv(context)) return KeyboardActions.Default
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val close: KeyboardActionScope.() -> Unit = { keyboard?.hide(); focusManager.clearFocus() }
+    return KeyboardActions(onDone = close, onNext = close, onGo = close, onSearch = close, onSend = close)
+}
+
+/** "Done" on TVs (see [formKeyboardActions]), the keyboard's default elsewhere. */
+@Composable
+fun formImeAction(): ImeAction = if (isTv(LocalContext.current)) ImeAction.Done else ImeAction.Default
 
 /** Rounded card with a title, optional subtitle and ⓘ explanation. */
 @Composable
@@ -110,7 +136,8 @@ fun NumberSetting(
             suffix = { Text(unit) },
             supportingText = { Text(if (value.isBlank() && blankMeans != null) blankMeans else hint) },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = formImeAction()),
+            keyboardActions = formKeyboardActions(),
             shape = MaterialTheme.shapes.medium,
             modifier = Modifier.weight(1f),
         )
