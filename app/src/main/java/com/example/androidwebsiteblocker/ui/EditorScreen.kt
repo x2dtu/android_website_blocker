@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.androidwebsiteblocker.Browsers
+import com.example.androidwebsiteblocker.isTv
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.DEFAULT_REMINDER_INTERVAL
@@ -369,8 +370,9 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             OutlinedTextField(
                 draft.message, { draft.message = it }, placeholder = { Text("e.g. Future you will thank you. Go to sleep.") },
                 shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(),
+                // Single line on TVs: Fire TV's keyboard traps you in multi-line fields.
+                singleLine = isTv(context),
                 maxLines = 4,
-                // "Done" instead of a newline key: some keyboards (Fire TV) otherwise trap you in the field.
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             )
