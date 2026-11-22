@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -46,8 +47,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Keyboard behavior for form fields. On TVs, Fire TV's full-screen keyboard sends "Next" even for
- * Done and would jump into the next text box, so both just close the keyboard and return to the
- * form (the remote moves on from there). On phones, Next moves to the next box as usual.
+ * Done; the default jumped into the next *text box* and kept the keyboard open, and clearing focus
+ * sent focus back above the field. So on TVs, Next/Done close the keyboard and move focus down to
+ * whatever comes next (a button, card, or field). On phones, Next works as usual.
  */
 @Composable
 fun formKeyboardActions(): KeyboardActions {
@@ -55,7 +57,10 @@ fun formKeyboardActions(): KeyboardActions {
     if (!isTv(context)) return KeyboardActions.Default
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val close: KeyboardActionScope.() -> Unit = { keyboard?.hide(); focusManager.clearFocus() }
+    val close: KeyboardActionScope.() -> Unit = {
+        keyboard?.hide()
+        focusManager.moveFocus(FocusDirection.Down)
+    }
     return KeyboardActions(onDone = close, onNext = close, onGo = close, onSearch = close, onSend = close)
 }
 
