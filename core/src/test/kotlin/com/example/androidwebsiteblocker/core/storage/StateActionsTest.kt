@@ -29,6 +29,14 @@ class StateActionsTest {
     private val set = BlockSet("s", "Bedtime", BlockMode.HARD, setOf(Target.App("com.a")), nightly, pinHash = pin)
     private val base = StateActions.addSet(AppState(), set)
 
+    @Test fun `move reorders sets and clamps the index`() {
+        val three = listOf("b", "c").fold(base) { st, id -> StateActions.addSet(st, set.copy(id = id)) }
+        assertEquals(listOf("b", "s", "c"), StateActions.moveSet(three, "s", 1).sets.map { it.id })
+        assertEquals(listOf("b", "c", "s"), StateActions.moveSet(three, "s", 99).sets.map { it.id })
+        assertEquals(listOf("c", "s", "b"), StateActions.moveSet(three, "c", -1).sets.map { it.id })
+        assertEquals(three, StateActions.moveSet(three, "missing", 0))
+    }
+
     @Test fun `tightening edit applies now and cancels pending`() {
         val (pending, _) = StateActions.requestEdit(base, set.copy(enabled = false), mon, zone)
         assertTrue(pending.pendingChanges.containsKey("s"))

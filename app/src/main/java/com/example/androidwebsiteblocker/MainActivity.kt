@@ -198,6 +198,7 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
             statusCard = { ServiceStatusCard(serviceEnabled, connected) },
             setupCard = if (batteryExempt) null else ({ BatteryCard() }),
             onOpenSet = { screen = "set:$it" },
+            onMoveSet = { id, to -> store.update { StateActions.moveSet(it, id, to) } },
             onCreate = { screen = "new" },
             onOpenLog = { screen = "log" },
         )
