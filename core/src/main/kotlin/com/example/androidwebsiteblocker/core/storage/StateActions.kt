@@ -23,6 +23,16 @@ object StateActions {
         return state.copy(sets = state.sets + set)
     }
 
+    /** Moves a set to [toIndex] in the list (display order only; blocking doesn't depend on it). */
+    fun moveSet(state: AppState, setId: String, toIndex: Int): AppState {
+        val from = state.sets.indexOfFirst { it.id == setId }
+        if (from < 0) return state
+        val list = state.sets.toMutableList()
+        val set = list.removeAt(from)
+        list.add(toIndex.coerceIn(0, list.size), set)
+        return state.copy(sets = list)
+    }
+
     /**
      * Submits an edit (including disable/enable). Tightening applies now; loosening becomes the
      * set's pending change. Any new edit replaces an existing pending change, since that change

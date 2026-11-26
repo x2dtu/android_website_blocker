@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -111,6 +113,7 @@ fun HomeScreen(
     statusCard: @Composable () -> Unit,
     setupCard: (@Composable () -> Unit)?,
     onOpenSet: (String) -> Unit,
+    onMoveSet: (id: String, toIndex: Int) -> Unit,
     onCreate: () -> Unit,
     onOpenLog: () -> Unit,
 ) {
@@ -118,6 +121,8 @@ fun HomeScreen(
     val zone = ZoneId.systemDefault()
     val statuses = state.sets.associate { it.id to statusOf(it, state, now, zone) }
     val activeCount = statuses.values.count { it.state == SetState.ACTIVE }
+    var reordering by remember { mutableStateOf(false) }
+    if (state.sets.size < 2) reordering = false
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             ScreenHeader(
@@ -143,10 +148,26 @@ fun HomeScreen(
                 }
             }
         }
-        items(state.sets, key = { it.id }) { set ->
-            SetCard(set, state.streakOf(set.id).days, statuses.getValue(set.id)) { onOpenSet(set.id) }
+        if (state.sets.size >= 2) item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Hint(if (reordering) "Use the arrows to move block sets" else "", Modifier.weight(1f))
+                TextButton(onClick = { reordering = !reordering }) { Text(if (reordering) "Done" else "Reorder") }
+            }
         }
-        item {
+        if (reordering) {
+            itemsIndexed(state.sets, key = { _, s -> s.id }) { i, set ->
+                ReorderRow(
+                    set, isFirst = i == 0, isLast = i == state.sets.lastIndex,
+                    onUp = { onMoveSet(set.id, i - 1) }, onDown = { onMoveSet(set.id, i + 1) },
+                    modifier = Modifier.animateItem(),
+                )
+            }
+        } else {
+            items(state.sets, key = { it.id }) { set ->
+                SetCard(set, state.streakOf(set.id).days, statuses.getValue(set.id)) { onOpenSet(set.id) }
+            }
+        }
+        if (!reordering) item {
             Button(onClick = onCreate, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("+ New block set") }
         }
         item {
@@ -189,6 +210,23 @@ private fun SetCard(set: BlockSet, streak: Int, status: SetStatus, onClick: () -
                 Box(Modifier.weight(1f))
                 if (streak > 0 && set.mode != BlockMode.REMINDER) Text("🔥 $streak-day streak", style = MaterialTheme.typography.labelLarge, color = accent)
             }
+        }
+    }
+}
+
+/** Compact row with move up/down buttons, shown while reordering. */
+@Composable
+private fun ReorderRow(set: BlockSet, isFirst: Boolean, isLast: Boolean, onUp: () -> Unit, onDown: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ColorDot(set.colorArgb.asColor(), 14.dp)
+            Text(set.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onUp, enabled = !isFirst) { Text("↑") }
+            OutlinedButton(onClick = onDown, enabled = !isLast) { Text("↓") }
         }
     }
 }
