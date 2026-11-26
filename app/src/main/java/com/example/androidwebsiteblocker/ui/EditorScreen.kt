@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
@@ -52,6 +54,9 @@ import com.example.androidwebsiteblocker.core.model.DEFAULT_REMINDER_INTERVAL
 import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
 import com.example.androidwebsiteblocker.core.model.SoftLimits
+import com.example.androidwebsiteblocker.core.model.PuzzleDifficulty
+import com.example.androidwebsiteblocker.core.model.PuzzleSettings
+import com.example.androidwebsiteblocker.core.model.PuzzleType
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.model.domainFromUserInput
 import com.example.androidwebsiteblocker.core.policy.findOverlaps
@@ -84,6 +89,11 @@ private class Draft(set: BlockSet?) {
     /** Soft sets: whether usage reminders are on. Reminder sets always remind. */
     var softReminders by mutableStateOf(set?.mode == BlockMode.SOFT && soft.reminderInterval != null)
     var reminderMin by mutableStateOf((soft.reminderInterval ?: DEFAULT_REMINDER_INTERVAL).toMinutes().toString())
+    var puzzleOn by mutableStateOf(soft.puzzle.enabled)
+    var puzzleTypes by mutableStateOf(soft.puzzle.types)
+    var puzzleDifficulty by mutableStateOf(soft.puzzle.difficulty)
+    var puzzleHarderEachOpen by mutableStateOf(soft.puzzle.harderEachOpen)
+    var puzzleLockoutSec by mutableStateOf(soft.puzzle.wrongAnswerLockout.seconds.toString())
 
     private val p = set?.protection ?: ProtectionSettings()
     var suspensionMin by mutableStateOf(p.suspensionDuration.toMinutes().toString())
@@ -129,6 +139,14 @@ private class Draft(set: BlockSet?) {
                 errors += "Reminder interval must be shorter than the total time ($total min)"
             }
         }
+        if (mode == BlockMode.SOFT && puzzleOn && puzzleTypes.isEmpty()) errors += "Pick at least one puzzle type"
+        val puzzle = PuzzleSettings(
+            enabled = puzzleOn,
+            types = puzzleTypes.ifEmpty { soft.puzzle.types },
+            difficulty = puzzleDifficulty,
+            harderEachOpen = puzzleHarderEachOpen,
+            wrongAnswerLockout = Duration.ofSeconds(num(puzzleLockoutSec, "Lockout after a wrong answer") ?: 10),
+        )
         val softLimits = SoftLimits(
             unlockDelay = Duration.ofSeconds(num(unlockDelaySec, "Unlock wait") ?: 0),
             maxOpens = num(maxOpens, "Opens allowed", 1)?.toInt(),
@@ -137,6 +155,7 @@ private class Draft(set: BlockSet?) {
             graceTime = Duration.ofSeconds(num(graceSec, "Grace period") ?: 15),
             timeWarnings = timeWarnings,
             reminderInterval = reminderInterval,
+            puzzle = puzzle,
         )
         val protection = ProtectionSettings(
             suspensionDuration = Duration.ofMinutes(num(suspensionMin, "Emergency pause length", 1) ?: 1),
@@ -291,11 +310,13 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
             ) {
                 LimitScopeChooser(draft.limitScope) { draft.limitScope = it }
                 NumberSetting(
-                    "Wait before Continue unlocks", draft.unlockDelaySec, { draft.unlockDelaySec = it }, "sec",
-                    hint = "0 = Continue is available right away",
-                    info = "When you open a blocked app, the Continue button stays locked for this long — a moment to change your mind. " +
-                        "If you leave the block screen, the wait starts over next time.",
+                    if (draft.puzzleOn) "Wait before the puzzle appears" else "Wait before Continue unlocks",
+                    draft.unlockDelaySec, { draft.unlockDelaySec = it }, "sec",
+                    hint = if (draft.puzzleOn) "0 = the puzzle shows right away" else "0 = Continue is available right away",
+                    info = "When you open a blocked app, the Continue button (or the puzzle, if it's on) stays locked for this long — " +
+                        "a moment to change your mind. If you leave the block screen, the wait starts over next time.",
                 )
+                PuzzleSettingsEditor(draft)
                 NumberSetting(
                     "Opens allowed", draft.maxOpens, { draft.maxOpens = it }, "opens",
                     hint = if (draft.limitScope == LimitScope.WHOLE_SET) "Shared, per window" else "Per app, per window",
@@ -463,6 +484,98 @@ private fun LimitScopeChooser(scope: LimitScope, label: String = "Limits apply t
             scope == LimitScope.WHOLE_SET, { onChange(LimitScope.WHOLE_SET) }, Modifier.weight(1f).fillMaxHeight(),
         )
     }
+}
+
+@Composable
+private fun PuzzleSettingsEditor(draft: Draft) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text("Puzzle before Continue", style = MaterialTheme.typography.bodyLarge)
+            Hint("Solve a puzzle to get in")
+        }
+        InfoButton(
+            "Puzzle before Continue",
+            "After the wait, a random puzzle appears instead of the Continue button. Solving it uses an open and takes you " +
+                "straight into the app — so you can't do the puzzle just for fun and back out.\n\n" +
+                "A wrong answer locks it for a few seconds, then gives you a new puzzle. Leaving the block screen " +
+                "starts the wait over with a new puzzle next time.\n\n" +
+                "Turning it off, removing types, or making it easier counts as loosening and waits for the cooling-off period.",
+        )
+        Switch(checked = draft.puzzleOn, onCheckedChange = { draft.puzzleOn = it })
+    }
+    if (!draft.puzzleOn) return
+    Column(
+        Modifier.fillMaxWidth().padding(start = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Puzzle types", style = MaterialTheme.typography.titleSmall)
+        Hint("One of these is picked at random each time")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PuzzleType.entries.forEach { t ->
+                FilterChip(
+                    selected = t in draft.puzzleTypes,
+                    onClick = { draft.puzzleTypes = if (t in draft.puzzleTypes) draft.puzzleTypes - t else draft.puzzleTypes + t },
+                    label = { Text(t.label()) },
+                )
+            }
+        }
+        draft.puzzleTypes.sortedBy { it.ordinal }.forEach { Hint("${it.label()}: ${it.description()}") }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Difficulty", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            InfoButton(
+                "Difficulty",
+                "Easy: two-digit sums, 4×4 sudoku, 5 digits to remember.\n" +
+                    "Medium: multiplication, sparser 4×4 sudoku, 6 digits.\n" +
+                    "Hard: bigger multiplication, 6×6 sudoku, 7 digits, and a two-sentence statement.",
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PuzzleDifficulty.entries.forEach { d ->
+                FilterChip(selected = draft.puzzleDifficulty == d, onClick = { draft.puzzleDifficulty = d }, label = { Text(d.label()) })
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text("Harder with each open", style = MaterialTheme.typography.bodyLarge)
+                Hint("Each open used this window adds a level")
+            }
+            InfoButton(
+                "Harder with each open",
+                "The first open of a window uses the difficulty above. Every open after that is one level harder, " +
+                    "up to the hardest puzzles (6×6 sudoku with few clues, 2-digit × 2-digit math, 9 digits to remember).",
+            )
+            Switch(checked = draft.puzzleHarderEachOpen, onCheckedChange = { draft.puzzleHarderEachOpen = it })
+        }
+        NumberSetting(
+            "Lockout after a wrong answer", draft.puzzleLockoutSec, { draft.puzzleLockoutSec = it }, "sec",
+            hint = "Then a new puzzle",
+            info = "A wrong answer hides the puzzle for this long, then shows a different one. 0 = a new puzzle right away.",
+        )
+    }
+}
+
+private fun PuzzleType.label() = when (this) {
+    PuzzleType.MATH -> "Math"
+    PuzzleType.SEQUENCE -> "Sequence"
+    PuzzleType.SUDOKU -> "Mini sudoku"
+    PuzzleType.SENTENCE -> "Type a sentence"
+    PuzzleType.MEMORY -> "Memory"
+}
+
+private fun PuzzleType.description() = when (this) {
+    PuzzleType.MATH -> "mental arithmetic, like 47 × 8 − 129"
+    PuzzleType.SEQUENCE -> "find the next number, like 3, 7, 15, 31, ?"
+    PuzzleType.SUDOKU -> "fill a 4×4 or 6×6 grid"
+    PuzzleType.SENTENCE -> "type out a statement about what you're choosing"
+    PuzzleType.MEMORY -> "remember digits shown for a few seconds"
+}
+
+internal fun PuzzleDifficulty.label() = when (this) {
+    PuzzleDifficulty.EASY -> "Easy"
+    PuzzleDifficulty.MEDIUM -> "Medium"
+    PuzzleDifficulty.HARD -> "Hard"
 }
 
 @Composable

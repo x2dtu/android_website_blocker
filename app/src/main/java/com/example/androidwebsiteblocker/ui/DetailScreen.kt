@@ -136,7 +136,15 @@ fun DetailScreen(
                 subtitle = if (set.limitScope == LimitScope.WHOLE_SET) "Shared across the whole set, reset each window" else "Per app or site, reset each window",
             ) {
                 val l = set.softLimits
-                LimitRow("Wait before Continue unlocks", if (l.unlockDelay.isZero) "None" else formatDuration(l.unlockDelay))
+                LimitRow(
+                    if (l.puzzle.enabled) "Wait before the puzzle" else "Wait before Continue unlocks",
+                    if (l.unlockDelay.isZero) "None" else formatDuration(l.unlockDelay),
+                )
+                LimitRow(
+                    "Puzzle before Continue",
+                    if (!l.puzzle.enabled) "Off"
+                    else l.puzzle.difficulty.label() + if (l.puzzle.harderEachOpen) ", harder each open" else "",
+                )
                 LimitRow("Opens allowed", l.maxOpens?.toString() ?: "Unlimited")
                 LimitRow("Time per open", l.perOpenLimit?.let(::formatDuration) ?: "No limit")
                 LimitRow("Total time", l.totalLimit?.let(::formatDuration) ?: "No limit")
