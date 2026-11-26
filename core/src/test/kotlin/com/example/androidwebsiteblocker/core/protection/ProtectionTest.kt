@@ -3,6 +3,9 @@ package com.example.androidwebsiteblocker.core.protection
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
+import com.example.androidwebsiteblocker.core.model.PuzzleDifficulty
+import com.example.androidwebsiteblocker.core.model.PuzzleSettings
+import com.example.androidwebsiteblocker.core.model.PuzzleType
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.schedule.DayWindow
@@ -116,6 +119,22 @@ class ChangeReviewTest {
         assertFalse(loosens { it.copy(softLimits = it.softLimits.copy(maxOpens = 2, totalLimit = Duration.ofMinutes(10))) })
         assertFalse(loosens { it.copy(mode = BlockMode.HARD) })
         assertFalse(isLoosening(soft.copy(enabled = false), soft))
+    }
+
+    @Test fun `puzzle changes`() {
+        val on = soft.copy(softLimits = soft.softLimits.copy(puzzle = PuzzleSettings(enabled = true, harderEachOpen = true)))
+        fun loosensPuzzle(change: (PuzzleSettings) -> PuzzleSettings) =
+            isLoosening(on, on.copy(softLimits = on.softLimits.copy(puzzle = change(on.softLimits.puzzle))))
+        assertTrue(loosensPuzzle { it.copy(enabled = false) })
+        assertTrue(loosensPuzzle { it.copy(types = setOf(PuzzleType.MATH)) })
+        assertTrue(loosensPuzzle { it.copy(difficulty = PuzzleDifficulty.EASY) })
+        assertTrue(loosensPuzzle { it.copy(harderEachOpen = false) })
+        assertTrue(loosensPuzzle { it.copy(wrongAnswerLockout = Duration.ZERO) })
+        assertFalse(loosensPuzzle { it.copy(difficulty = PuzzleDifficulty.HARD, wrongAnswerLockout = Duration.ofSeconds(30)) })
+        assertFalse(isLoosening(soft, on)) // turning it on
+        // Settings of a puzzle that's off don't matter.
+        val off = soft.softLimits.puzzle.copy(difficulty = PuzzleDifficulty.HARD)
+        assertFalse(isLoosening(soft.copy(softLimits = soft.softLimits.copy(puzzle = off)), soft))
     }
 
     @Test fun `mixed edit counts as loosening`() {

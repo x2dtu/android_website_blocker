@@ -4,6 +4,9 @@ import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
+import com.example.androidwebsiteblocker.core.model.PuzzleDifficulty
+import com.example.androidwebsiteblocker.core.model.PuzzleSettings
+import com.example.androidwebsiteblocker.core.model.PuzzleType
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.policy.OpenRecord
@@ -32,7 +35,8 @@ class AppStateCodecTest {
         id = "s1", name = "Night Socials", mode = BlockMode.SOFT,
         targets = setOf(Target.App("com.instagram.android"), Target.Website("reddit.com"), Target.AdultWebsites),
         schedule = WeeklySchedule(listOf(DayWindow(DayOfWeek.SUNDAY, 0, 480), DayWindow(DayOfWeek.SATURDAY, 1380, MINUTES_PER_DAY))),
-        softLimits = SoftLimits(Duration.ofSeconds(10), 4, Duration.ofMinutes(3), Duration.ofMinutes(12), Duration.ofSeconds(20), timeWarnings = false, reminderInterval = Duration.ofMinutes(15)),
+        softLimits = SoftLimits(Duration.ofSeconds(10), 4, Duration.ofMinutes(3), Duration.ofMinutes(12), Duration.ofSeconds(20), timeWarnings = false, reminderInterval = Duration.ofMinutes(15),
+            puzzle = PuzzleSettings(true, setOf(PuzzleType.SUDOKU, PuzzleType.SENTENCE), PuzzleDifficulty.HARD, true, Duration.ofSeconds(20))),
         protection = ProtectionSettings(Duration.ofMinutes(2), null, Duration.ofSeconds(45), Duration.ofMinutes(7)),
         limitScope = LimitScope.WHOLE_SET,
         message = "Sleep is a superpower",
@@ -71,6 +75,12 @@ class AppStateCodecTest {
     @Test fun `ignores unknown fields from newer minor changes`() {
         val text = AppStateCodec.encode(AppState()).replaceFirst("{", "{\"futureField\":true,")
         assertEquals(AppState(), AppStateCodec.decode(text))
+    }
+
+    @Test fun `files from before puzzles load with the puzzle off`() {
+        val text = AppStateCodec.encode(AppState(sets = listOf(soft))).replace(Regex("\"puzzle\":\\{[^}]*\\},"), "")
+        assertTrue(!text.contains("puzzle"))
+        assertEquals(PuzzleSettings(), AppStateCodec.decode(text).sets.first().softLimits.puzzle)
     }
 
     @Test(expected = IllegalArgumentException::class)

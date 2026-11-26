@@ -60,7 +60,7 @@ enum class LimitScope { EACH_TARGET, WHOLE_SET }
  * They apply to each target in the set separately, and reset each window occurrence.
  */
 data class SoftLimits(
-    /** How long the "continue" button stays disabled on the block screen. Restarts if you leave the screen. */
+    /** How long the "continue" button (or the puzzle, if on) stays locked on the block screen. Restarts if you leave the screen. */
     val unlockDelay: Duration = Duration.ZERO,
     /** Max opens per window occurrence. */
     val maxOpens: Int? = null,
@@ -77,6 +77,8 @@ data class SoftLimits(
      * sets always remind (falling back to [DEFAULT_REMINDER_INTERVAL]).
      */
     val reminderInterval: Duration? = null,
+    /** Optional puzzle before Continue (after [unlockDelay]). */
+    val puzzle: PuzzleSettings = PuzzleSettings(),
 ) {
     init {
         require(!unlockDelay.isNegative && !graceTime.isNegative)

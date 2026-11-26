@@ -3,6 +3,7 @@ package com.example.androidwebsiteblocker.core.protection
 import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.LimitScope
+import com.example.androidwebsiteblocker.core.model.PuzzleSettings
 import java.time.Instant
 
 /** A disable or loosening edit waiting out the set's change wait. One per set; a newer edit replaces it. */
@@ -50,6 +51,7 @@ fun isLoosening(old: BlockSet, new: BlockSet): Boolean {
         if (looser(o.totalLimit, n.totalLimit)) return true
         if (n.graceTime > o.graceTime) return true
         if (old.limitScope == LimitScope.WHOLE_SET && new.limitScope == LimitScope.EACH_TARGET) return true
+        if (isLoosening(o.puzzle, n.puzzle)) return true
     }
 
     val o = old.protection
@@ -59,6 +61,16 @@ fun isLoosening(old: BlockSet, new: BlockSet): Boolean {
     if (n.suspensionCooldown < o.suspensionCooldown) return true
     if (n.changeWait < o.changeWait) return true
     return false
+}
+
+/** Turning the puzzle off, dropping a type, lowering difficulty or the lockout, or no longer escalating. */
+private fun isLoosening(old: PuzzleSettings, new: PuzzleSettings): Boolean {
+    if (!old.enabled) return false
+    if (!new.enabled) return true
+    if (!new.types.containsAll(old.types)) return true
+    if (new.difficulty < old.difficulty) return true
+    if (old.harderEachOpen && !new.harderEachOpen) return true
+    return new.wrongAnswerLockout < old.wrongAnswerLockout
 }
 
 /** For limits where null means unlimited. */

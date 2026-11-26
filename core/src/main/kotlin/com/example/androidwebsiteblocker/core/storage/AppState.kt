@@ -4,6 +4,9 @@ import com.example.androidwebsiteblocker.core.model.BlockMode
 import com.example.androidwebsiteblocker.core.model.BlockSet
 import com.example.androidwebsiteblocker.core.model.LimitScope
 import com.example.androidwebsiteblocker.core.model.ProtectionSettings
+import com.example.androidwebsiteblocker.core.model.PuzzleDifficulty
+import com.example.androidwebsiteblocker.core.model.PuzzleSettings
+import com.example.androidwebsiteblocker.core.model.PuzzleType
 import com.example.androidwebsiteblocker.core.model.SoftLimits
 import com.example.androidwebsiteblocker.core.model.Target
 import com.example.androidwebsiteblocker.core.policy.OpenRecord
@@ -80,6 +83,7 @@ private data class SetDto(
     val timeWarnings: Boolean = true,
     val limitScope: String = "EACH_TARGET",
     val reminderIntervalMs: Long? = null,
+    val puzzle: PuzzleDto? = null,
     val suspensionMs: Long,
     val maxSuspensions: Int?,
     val suspensionCooldownMs: Long,
@@ -89,6 +93,15 @@ private data class SetDto(
     val pinHash: String?,
     val enabled: Boolean,
     val suspendedUntil: Long?,
+)
+
+@Serializable
+private data class PuzzleDto(
+    val enabled: Boolean,
+    val types: List<String>,
+    val difficulty: String,
+    val harderEachOpen: Boolean,
+    val wrongAnswerLockoutMs: Long,
 )
 
 @Serializable
@@ -173,6 +186,9 @@ private fun BlockSet.toDto() = SetDto(
     graceMs = softLimits.graceTime.toMillis(),
     timeWarnings = softLimits.timeWarnings,
     reminderIntervalMs = softLimits.reminderInterval?.toMillis(),
+    puzzle = softLimits.puzzle.let {
+        PuzzleDto(it.enabled, it.types.map { t -> t.name }.sorted(), it.difficulty.name, it.harderEachOpen, it.wrongAnswerLockout.toMillis())
+    },
     limitScope = limitScope.name,
     suspensionMs = protection.suspensionDuration.toMillis(),
     maxSuspensions = protection.maxSuspensions,
@@ -194,6 +210,7 @@ private fun SetDto.toDomain() = BlockSet(
         graceTime = Duration.ofMillis(graceMs),
         timeWarnings = timeWarnings,
         reminderInterval = reminderIntervalMs?.let(Duration::ofMillis),
+        puzzle = puzzle?.toDomain() ?: PuzzleSettings(),
     ),
     limitScope = LimitScope.valueOf(limitScope),
     protection = ProtectionSettings(
@@ -205,6 +222,18 @@ private fun SetDto.toDomain() = BlockSet(
     message = message, colorArgb = colorArgb, pinHash = pinHash, enabled = enabled,
     suspendedUntil = suspendedUntil?.let(Instant::ofEpochMilli),
 )
+
+private fun PuzzleDto.toDomain(): PuzzleSettings {
+    // Unknown names (from a newer app version) are skipped rather than failing the whole file.
+    val known = types.mapNotNull { name -> PuzzleType.entries.firstOrNull { it.name == name } }.toSet()
+    return PuzzleSettings(
+        enabled = enabled,
+        types = known.ifEmpty { PuzzleType.entries.toSet() },
+        difficulty = PuzzleDifficulty.entries.firstOrNull { it.name == difficulty } ?: PuzzleDifficulty.MEDIUM,
+        harderEachOpen = harderEachOpen,
+        wrongAnswerLockout = Duration.ofMillis(wrongAnswerLockoutMs),
+    )
+}
 
 private fun Target.toDto() = when (this) {
     is Target.App -> TargetDto("app", packageName)
