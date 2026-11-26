@@ -53,13 +53,28 @@ fun isNight(time: LocalTime): Boolean = time.hour >= 21 || time.hour < 5
 object Puzzles {
     const val MAX_LEVEL = 4
 
-    /** 0 (easy) … [MAX_LEVEL]. */
-    fun level(settings: PuzzleSettings, opensUsed: Int): Int =
-        (settings.difficulty.ordinal + if (settings.harderEachOpen) opensUsed else 0).coerceIn(0, MAX_LEVEL)
+    /**
+     * 0 (easy) … [MAX_LEVEL] for the next open. With [PuzzleSettings.harderEachOpen], the climb from
+     * the starting difficulty to [MAX_LEVEL] is spread over the window's [maxOpens] so the last open
+     * is always the hardest (8 opens from easy: 0, 0, 1, 1, 2, 2, 3, 4). With unlimited opens, or
+     * fewer opens than levels to climb, it's one level per open.
+     */
+    fun level(settings: PuzzleSettings, opensUsed: Int, maxOpens: Int?): Int {
+        val start = settings.difficulty.ordinal
+        if (!settings.harderEachOpen) return start
+        val steps = MAX_LEVEL - start
+        val climb = if (maxOpens == null || maxOpens <= steps + 1) opensUsed else opensUsed * steps / (maxOpens - 1)
+        return (start + climb).coerceIn(0, MAX_LEVEL)
+    }
 
     /** A random puzzle of one of the set's types. */
-    fun generate(settings: PuzzleSettings, opensUsed: Int, context: PuzzleContext, random: Random = Random.Default): Puzzle =
-        generate(settings.types.random(random), level(settings, opensUsed), context, random)
+    fun generate(
+        settings: PuzzleSettings,
+        opensUsed: Int,
+        maxOpens: Int?,
+        context: PuzzleContext,
+        random: Random = Random.Default,
+    ): Puzzle = generate(settings.types.random(random), level(settings, opensUsed, maxOpens), context, random)
 
     fun generate(type: PuzzleType, level: Int, context: PuzzleContext, random: Random = Random.Default): Puzzle {
         val l = level.coerceIn(0, MAX_LEVEL)

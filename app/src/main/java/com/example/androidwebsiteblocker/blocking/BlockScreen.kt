@@ -211,7 +211,7 @@ private fun SoftControls(
             Text("Puzzle in ${secondsLeft}s", style = MaterialTheme.typography.titleMedium)
         }
     } else {
-        PuzzleGate(resetKey, puzzle, soft.opensUsed, targetLabel, accent, onSolved = onContinue)
+        PuzzleGate(resetKey, puzzle, soft.opensUsed, soft.maxOpens, targetLabel, accent, onSolved = onContinue)
     }
     TextButton(onClick = onGoHome, modifier = Modifier.fillMaxWidth()) { Text(leaveLabel, color = Color.White) }
 }
@@ -231,12 +231,13 @@ private fun PuzzleGate(
     resetKey: String,
     settings: PuzzleSettings,
     opensUsed: Int,
+    maxOpens: Int?,
     targetLabel: String,
     accent: Color,
     onSolved: () -> Unit,
 ) {
     fun newPuzzle() = Puzzles.generate(
-        settings, opensUsed, PuzzleContext(targetLabel.removePrefix("www."), isNight(LocalTime.now())),
+        settings, opensUsed, maxOpens, PuzzleContext(targetLabel.removePrefix("www."), isNight(LocalTime.now())),
     )
     var puzzle by remember(resetKey) { mutableStateOf(newPuzzle()) }
     var lockedUntil by remember(resetKey) { mutableLongStateOf(0L) }

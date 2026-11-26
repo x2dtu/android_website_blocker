@@ -14,19 +14,42 @@ class PuzzlesTest {
     private val ctx = PuzzleContext("Reddit", night = true)
 
     @Test
-    fun `level starts at difficulty and climbs with opens when enabled`() {
+    fun `level stays at the difficulty unless escalating`() {
         val s = PuzzleSettings(difficulty = PuzzleDifficulty.EASY)
-        assertEquals(0, Puzzles.level(s, opensUsed = 3))
-        assertEquals(3, Puzzles.level(s.copy(harderEachOpen = true), opensUsed = 3))
-        assertEquals(Puzzles.MAX_LEVEL, Puzzles.level(s.copy(difficulty = PuzzleDifficulty.HARD, harderEachOpen = true), opensUsed = 9))
-        assertEquals(1, Puzzles.level(PuzzleSettings(), opensUsed = 0)) // medium
+        assertEquals(0, Puzzles.level(s, opensUsed = 3, maxOpens = 8))
+        assertEquals(1, Puzzles.level(PuzzleSettings(), opensUsed = 0, maxOpens = null)) // medium
+    }
+
+    @Test
+    fun `escalation spreads over the allowed opens and ends at the hardest`() {
+        val s = PuzzleSettings(difficulty = PuzzleDifficulty.EASY, harderEachOpen = true)
+        assertEquals(listOf(0, 0, 1, 1, 2, 2, 3, 4), (0 until 8).map { Puzzles.level(s, it, maxOpens = 8) })
+        assertEquals(listOf(0, 1, 2, 3, 4), (0 until 5).map { Puzzles.level(s, it, maxOpens = 5) })
+        val medium = s.copy(difficulty = PuzzleDifficulty.MEDIUM)
+        assertEquals(listOf(1, 1, 1, 2, 2, 3, 3, 4), (0 until 8).map { Puzzles.level(medium, it, maxOpens = 8) })
+        for (max in 5..30) {
+            val levels = (0 until max).map { Puzzles.level(s, it, maxOpens = max) }
+            assertEquals(0, levels.first())
+            assertEquals(Puzzles.MAX_LEVEL, levels.last())
+            assertEquals(levels.sorted(), levels) // never gets easier
+            assertTrue(levels.zipWithNext().all { (x, y) -> y - x <= 1 }) // one level at a time
+        }
+    }
+
+    @Test
+    fun `one level per open when unlimited or fewer opens than levels`() {
+        val s = PuzzleSettings(difficulty = PuzzleDifficulty.EASY, harderEachOpen = true)
+        assertEquals(listOf(0, 1, 2, 3, 4, 4, 4), (0 until 7).map { Puzzles.level(s, it, maxOpens = null) })
+        assertEquals(listOf(0, 1, 2), (0 until 3).map { Puzzles.level(s, it, maxOpens = 3) })
+        val hard = s.copy(difficulty = PuzzleDifficulty.HARD)
+        assertEquals(listOf(2, 3, 4), (0 until 3).map { Puzzles.level(hard, it, maxOpens = 3) })
     }
 
     @Test
     fun `only picks enabled types`() {
         val s = PuzzleSettings(types = setOf(PuzzleType.MATH, PuzzleType.MEMORY))
         val r = Random(1)
-        repeat(50) { assertTrue(Puzzles.generate(s, 0, ctx, r).type in s.types) }
+        repeat(50) { assertTrue(Puzzles.generate(s, 0, null, ctx, r).type in s.types) }
     }
 
     @Test

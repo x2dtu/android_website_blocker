@@ -539,12 +539,14 @@ private fun PuzzleSettingsEditor(draft: Draft) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f)) {
                 Text("Harder with each open", style = MaterialTheme.typography.bodyLarge)
-                Hint("Each open used this window adds a level")
+                Hint("Ramps up to the hardest by your last open")
             }
             InfoButton(
                 "Harder with each open",
-                "The first open of a window uses the difficulty above. Every open after that is one level harder, " +
-                    "up to the hardest puzzles (6×6 sudoku with few clues, 2-digit × 2-digit math, 9 digits to remember).",
+                "The first open of a window uses the difficulty above. Later opens get harder, spread out so your last " +
+                    "allowed open gets the hardest puzzles (6×6 sudoku with few clues, 2-digit × 2-digit math, 9 digits to remember). " +
+                    "For example, 8 opens starting from Easy go: easy, easy, medium, medium, hard, hard, harder, hardest.\n\n" +
+                    "With unlimited opens, or only a few, each open is one level harder until the hardest.",
             )
             Switch(checked = draft.puzzleHarderEachOpen, onCheckedChange = { draft.puzzleHarderEachOpen = it })
         }
