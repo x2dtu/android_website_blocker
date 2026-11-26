@@ -96,7 +96,7 @@ fun isServiceEnabled(context: Context): Boolean {
     }
 }
 
-/** Screens: "home", "log", "new", "set:<id>", "edit:<id>". A string so it survives rotation. */
+/** Screens: "home", "log", "new", "set:<id>", "edit:<id>", "copy:<id>". A string so it survives rotation. */
 @Composable
 private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: Boolean) {
     val context = LocalContext.current
@@ -119,6 +119,22 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
             },
             onCancel = { screen = "home" },
         )
+
+        screen.startsWith("copy:") -> {
+            val source = state.setById(screen.removePrefix("copy:"))
+            if (source == null) { screen = "home"; return }
+            EditorScreen(
+                original = null,
+                copyOf = source,
+                otherSets = state.sets,
+                onSave = { set ->
+                    store.update { StateActions.addSet(it, set) }
+                    toast("Created ${set.name}")
+                    screen = "set:${set.id}"
+                },
+                onCancel = { screen = "set:${source.id}" },
+            )
+        }
 
         screen.startsWith("edit:") -> {
             val set = state.setById(screen.removePrefix("edit:"))
@@ -171,6 +187,7 @@ private fun AppRoot(store: StateStore, serviceEnabled: Boolean, batteryExempt: B
                     }
                 },
                 onCancelPending = { store.update { StateActions.cancelPending(it, set.id) } },
+                onDuplicate = { screen = "copy:${set.id}" },
                 onBack = { screen = "home" },
             )
         }

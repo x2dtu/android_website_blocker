@@ -63,6 +63,7 @@ fun DetailScreen(
     state: AppState,
     onAction: (SetAction) -> Unit,
     onCancelPending: () -> Unit,
+    onDuplicate: () -> Unit,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -182,6 +183,8 @@ fun DetailScreen(
                 onClick = { if (set.pinHash == null) onAction(SetAction.EDIT) else pinFor = SetAction.EDIT },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Edit block set") }
+            // A copy is a new set, which can only add blocking, so no PIN needed.
+            OutlinedButton(onClick = onDuplicate, modifier = Modifier.fillMaxWidth()) { Text("Duplicate as a new block set") }
             if (set.enabled) {
                 OutlinedButton(onClick = { pinFor = SetAction.DISABLE }, modifier = Modifier.fillMaxWidth()) { Text("Turn off") }
                 Hint("Turning off takes effect after ${formatDuration(set.protection.changeWait)}. You can cancel it until then.")
