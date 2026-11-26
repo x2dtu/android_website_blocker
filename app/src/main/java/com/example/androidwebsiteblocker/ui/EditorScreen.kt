@@ -68,10 +68,13 @@ import java.time.Duration
 import java.util.UUID
 import kotlinx.coroutines.delay
 
-/** Editable copy of a block set. Numbers are kept as text so fields can be empty (= no limit). */
-private class Draft(set: BlockSet?) {
-    val id = set?.id ?: UUID.randomUUID().toString()
-    var name by mutableStateOf(set?.name ?: "")
+/**
+ * Editable copy of a block set. Numbers are kept as text so fields can be empty (= no limit).
+ * [asCopy]: start a new set from [set]'s settings (new id, "(copy)" name, own PIN).
+ */
+private class Draft(set: BlockSet?, asCopy: Boolean = false) {
+    val id = if (set == null || asCopy) UUID.randomUUID().toString() else set.id
+    var name by mutableStateOf(set?.name?.let { if (asCopy) "$it (copy)" else it } ?: "")
     var color by mutableStateOf(set?.colorArgb ?: SET_COLORS.first())
     var mode by mutableStateOf(set?.mode ?: BlockMode.HARD)
     var message by mutableStateOf(set?.message ?: "")
@@ -101,7 +104,7 @@ private class Draft(set: BlockSet?) {
     var cooldownSec by mutableStateOf(p.suspensionCooldown.seconds.toString())
     var changeWaitMin by mutableStateOf(p.changeWait.toMinutes().toString())
 
-    var usePin by mutableStateOf(true)
+    var usePin by mutableStateOf(!asCopy || set?.pinHash != null)
     var pin by mutableStateOf("")
     var pinConfirm by mutableStateOf("")
 
@@ -183,10 +186,19 @@ private class Draft(set: BlockSet?) {
     fun preview(): BlockSet = BlockSet(id, name.ifBlank { "This set" }, mode, targets.toSet(), WeeklySchedule(windows))
 }
 
-/** Create ([original] null) or edit a block set. PIN for edits is checked before opening this. */
+/**
+ * Create ([original] null) or edit a block set. PIN for edits is checked before opening this.
+ * [copyOf]: create a new set pre-filled from an existing one.
+ */
 @Composable
-fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockSet) -> Unit, onCancel: () -> Unit) {
-    val draft = remember(original?.id) { Draft(original) }
+fun EditorScreen(
+    original: BlockSet?,
+    otherSets: List<BlockSet>,
+    onSave: (BlockSet) -> Unit,
+    onCancel: () -> Unit,
+    copyOf: BlockSet? = null,
+) {
+    val draft = remember(original?.id, copyOf?.id) { if (original != null) Draft(original) else Draft(copyOf, asCopy = true) }
     var errors by remember { mutableStateOf(emptyList<String>()) }
     var picking by remember { mutableStateOf(false) }
 
@@ -208,7 +220,14 @@ fun EditorScreen(original: BlockSet?, otherSets: List<BlockSet>, onSave: (BlockS
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        ScreenHeader(if (original == null) "New block set" else "Edit block set", onBack = onCancel)
+        ScreenHeader(
+            when {
+                original != null -> "Edit block set"
+                copyOf != null -> "Copy of ${copyOf.name}"
+                else -> "New block set"
+            },
+            onBack = onCancel,
+        )
 
         SectionCard("Name & color") {
             OutlinedTextField(
