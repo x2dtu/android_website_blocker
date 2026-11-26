@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -30,7 +32,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,10 +46,15 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.androidwebsiteblocker.core.model.PuzzleSettings
 import com.example.androidwebsiteblocker.core.model.Target
+import com.example.androidwebsiteblocker.core.puzzle.PuzzleContext
+import com.example.androidwebsiteblocker.core.puzzle.Puzzles
+import com.example.androidwebsiteblocker.core.puzzle.isNight
 import com.example.androidwebsiteblocker.ui.TargetIcon
 import com.example.androidwebsiteblocker.ui.theme.Typography
 import java.time.Duration
+import java.time.LocalTime
 import kotlinx.coroutines.delay
 
 /** Everything the block screen shows. A new [resetKey] restarts the unlock countdown. */
@@ -74,6 +83,8 @@ data class SoftGateInfo(
     val totalLimit: Duration? = null,
     /** e.g. "3 min per open". */
     val limitsSummary: String,
+    /** Puzzle instead of the Continue button after the wait; null = no puzzle. */
+    val puzzle: PuzzleSettings? = null,
 )
 
 private val Muted = Color(0xFFB4B9D2)
@@ -90,7 +101,8 @@ fun BlockScreen(model: BlockScreenModel, onGoHome: () -> Unit, onContinue: () ->
                 .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Column(
-                Modifier.align(Alignment.Center).fillMaxWidth(),
+                // Scrolls when a puzzle (and the keyboard) make it taller than the screen.
+                Modifier.align(Alignment.Center).fillMaxWidth().verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
@@ -144,7 +156,7 @@ fun BlockScreen(model: BlockScreenModel, onGoHome: () -> Unit, onContinue: () ->
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                     ) { Text(model.leaveLabel, style = MaterialTheme.typography.titleMedium) }
                 } else {
-                    SoftControls(model.resetKey, soft, accent, model.leaveLabel, onGoHome, onContinue)
+                    SoftControls(model.resetKey, soft, accent, model.leaveLabel, model.targetLabel, onGoHome, onContinue)
                 }
             }
         }
@@ -157,6 +169,7 @@ private fun SoftControls(
     soft: SoftGateInfo,
     accent: Color,
     leaveLabel: String,
+    targetLabel: String,
     onGoHome: () -> Unit,
     onContinue: () -> Unit,
 ) {
@@ -183,18 +196,77 @@ private fun SoftControls(
             secondsLeft = remaining()
         }
     }
-    Button(
-        onClick = onContinue,
-        enabled = secondsLeft <= 0,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = accent, contentColor = Ink,
-            disabledContainerColor = Color.White.copy(alpha = 0.08f), disabledContentColor = Muted,
-        ),
-        modifier = Modifier.fillMaxWidth().height(54.dp),
-    ) {
-        Text(if (secondsLeft > 0) "Continue in ${secondsLeft}s" else "Continue to app", style = MaterialTheme.typography.titleMedium)
+    val puzzle = soft.puzzle
+    if (puzzle == null) {
+        Button(
+            onClick = onContinue,
+            enabled = secondsLeft <= 0,
+            colors = lockedButtonColors(accent),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+        ) {
+            Text(if (secondsLeft > 0) "Continue in ${secondsLeft}s" else "Continue to app", style = MaterialTheme.typography.titleMedium)
+        }
+    } else if (secondsLeft > 0) {
+        Button(onClick = {}, enabled = false, colors = lockedButtonColors(accent), modifier = Modifier.fillMaxWidth().height(54.dp)) {
+            Text("Puzzle in ${secondsLeft}s", style = MaterialTheme.typography.titleMedium)
+        }
+    } else {
+        PuzzleGate(resetKey, puzzle, soft.opensUsed, targetLabel, accent, onSolved = onContinue)
     }
     TextButton(onClick = onGoHome, modifier = Modifier.fillMaxWidth()) { Text(leaveLabel, color = Color.White) }
+}
+
+@Composable
+private fun lockedButtonColors(accent: Color) = ButtonDefaults.buttonColors(
+    containerColor = accent, contentColor = Ink,
+    disabledContainerColor = Color.White.copy(alpha = 0.08f), disabledContentColor = Muted,
+)
+
+/**
+ * A random puzzle; solving it continues into the app. A wrong answer hides it for the lockout,
+ * then shows a new one. New [resetKey] (e.g. the block screen was left and reopened) = new puzzle.
+ */
+@Composable
+private fun PuzzleGate(
+    resetKey: String,
+    settings: PuzzleSettings,
+    opensUsed: Int,
+    targetLabel: String,
+    accent: Color,
+    onSolved: () -> Unit,
+) {
+    fun newPuzzle() = Puzzles.generate(
+        settings, opensUsed, PuzzleContext(targetLabel.removePrefix("www."), isNight(LocalTime.now())),
+    )
+    var puzzle by remember(resetKey) { mutableStateOf(newPuzzle()) }
+    var lockedUntil by remember(resetKey) { mutableLongStateOf(0L) }
+    var wrongCount by remember(resetKey) { mutableIntStateOf(0) }
+    var lockLeft by remember(resetKey) { mutableLongStateOf(0L) }
+    LaunchedEffect(resetKey, lockedUntil) {
+        while (true) {
+            lockLeft = ((lockedUntil - SystemClock.elapsedRealtime() + 999) / 1000).coerceAtLeast(0)
+            if (lockLeft == 0L) break
+            delay(200)
+        }
+    }
+    if (wrongCount > 0) {
+        Text(
+            if (lockLeft > 0) "Not quite. New puzzle in ${lockLeft}s" else "Not quite. Here's a new one.",
+            color = Color(0xFFFF8A80), style = MaterialTheme.typography.titleSmall,
+        )
+    }
+    if (lockLeft == 0L) {
+        PuzzleView(puzzle, accent) { right ->
+            if (right) {
+                onSolved()
+            } else {
+                wrongCount++
+                puzzle = newPuzzle()
+                lockedUntil = SystemClock.elapsedRealtime() + settings.wrongAnswerLockout.toMillis()
+                lockLeft = settings.wrongAnswerLockout.toMillis().let { (it + 999) / 1000 }
+            }
+        }
+    }
 }
 
 /** "8 of 20 min left" (seconds dropped), or "<1 min of 20 min left" in the last minute. */

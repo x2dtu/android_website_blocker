@@ -225,6 +225,9 @@ class BlockController(private val service: AccessibilityService, private val sto
                         totalLimit = gate.totalLimit,
                         // Total time is shown as "X of Y left" above, so only the per-open limit here.
                         limitsSummary = set.softLimits.perOpenLimit?.let { "${formatDuration(it)} per open" }.orEmpty(),
+                        // With several gating sets, the hardest puzzle setting among them applies.
+                        puzzle = decision.gates.mapNotNull { state.setById(it.setId)?.softLimits?.puzzle?.takeIf { p -> p.enabled } }
+                            .maxWithOrNull(compareBy({ it.difficulty }, { it.harderEachOpen }, { it.wrongAnswerLockout })),
                     ),
                     leaveLabel = leaveLabel(fg),
                 )

@@ -10,6 +10,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import android.graphics.Color as AndroidColor
 
 /**
@@ -19,6 +21,9 @@ import android.graphics.Color as AndroidColor
  * goes null.
  */
 class BlockActivity : ComponentActivity() {
+
+    /** Counts each time the screen comes back into view; part of the reset key so the wait and puzzle start over. */
+    private var visits by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Dark scrims → light status/nav icons over the dark block screen.
@@ -35,7 +40,7 @@ class BlockActivity : ComponentActivity() {
             if (m == null) {
                 LaunchedEffect(Unit) { finishQuietly() }
             } else {
-                BlockScreen(m, onGoHome = { BlockScreenHost.onLeave() }, onContinue = { BlockScreenHost.onContinue() })
+                BlockScreen(m.copy(resetKey = "${m.resetKey}#$visits"), onGoHome = { BlockScreenHost.onLeave() }, onContinue = { BlockScreenHost.onContinue() })
             }
         }
     }
@@ -43,6 +48,7 @@ class BlockActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         BlockScreenHost.visible = true
+        visits++
     }
 
     override fun onStop() {
